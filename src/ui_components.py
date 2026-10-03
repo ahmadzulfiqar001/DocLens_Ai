@@ -412,3 +412,14 @@ def get_medical_comparison_badge(comparison: str, has_conflict: bool = False) ->
         return '<span class="badge-pill badge-clear">✓ Within range</span>'
     else:
         return '<span class="badge-pill badge-low">❓ Cannot assess from range</span>'
+
+def render_html(html_str: str):
+    """Safely renders HTML without Markdown indentation or code block interpretation."""
+    import textwrap
+    import streamlit as st
+    clean_html = textwrap.dedent(html_str).strip()
+    if hasattr(st, "html"):
+        st.html(clean_html)
+    else:
+        st.markdown(clean_html, unsafe_allow_html=True)
+

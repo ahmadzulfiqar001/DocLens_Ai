@@ -53,6 +53,7 @@ from src.ui_components import (
     render_medical_avatar_banner,
     render_sidebar_header,
     render_hero_banner,
+    render_html,
     get_priority_badge,
     get_medical_comparison_badge
 )
@@ -568,10 +569,10 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         st.markdown(
             f"""
-            <div class="dl-card dl-card-glow-indigo">
+            <div class="dl-card dl-card-glow-emerald">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem;">
                     <div>
-                        <div style="font-size: 0.78rem; text-transform: uppercase; color: #818CF8; font-weight: 700; letter-spacing: 0.05em;">
+                        <div style="font-size: 0.78rem; text-transform: uppercase; color: #00E599; font-weight: 700; letter-spacing: 0.05em;">
                             {subtype.upper()} • COVERAGE: {data.get('coverage_statement', 'Full document evaluated')}
                         </div>
                         <h2 style="margin: 0.2rem 0; font-size: 1.55rem; color: #FFFFFF; font-weight: 700;">
@@ -661,7 +662,7 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                     action = f.get("suggested_action", "")
                     prio = f.get("review_priority", "Low")
 
-                    glow_class = "dl-card-glow-rose" if prio == "High" else ("dl-card-glow-amber" if prio == "Medium" else "dl-card-glow-indigo")
+                    glow_class = "dl-card-glow-rose" if prio == "High" else ("dl-card-glow-amber" if prio == "Medium" else "dl-card-glow-emerald")
 
                     st.markdown(
                         f"""
@@ -682,7 +683,7 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                             <div class="{rtl_class}" style="color: #CBD5E1; font-size: 0.92rem; margin: 0.5rem 0;">
                                 {expl}
                             </div>
-                            {f'<div style="background: rgba(99, 102, 241, 0.1); border-left: 3px solid #818CF8; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #C7D2FE; margin-top: 0.5rem;"><strong>Suggested Question:</strong> {clarify}</div>' if clarify else ''}
+                            {f'<div style="background: rgba(0, 229, 153, 0.12); border-left: 3px solid #00E599; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #6EE7B7; margin-top: 0.5rem;"><strong>Suggested Question:</strong> {clarify}</div>' if clarify else ''}
                             {f'<div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid #34D399; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #A7F3D0; margin-top: 0.4rem;"><strong>Recommended Action:</strong> {action}</div>' if action else ''}
                         </div>
                         """,
@@ -693,7 +694,7 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                 for gf in gen_findings:
                     st.markdown(
                         f"""
-                        <div class="dl-card dl-card-glow-indigo">
+                        <div class="dl-card dl-card-glow-emerald">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <span style="font-size: 1.1rem; font-weight: 700; color: #FFFFFF;">{gf.get('topic', 'Topic')}</span>
                                 <span class="badge-pill badge-source">{gf.get('source_id', 'Source')}</span>
@@ -714,37 +715,27 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
             kd = data.get("key_details", {})
             col_k1, col_k2 = st.columns(2)
             with col_k1:
-                st.markdown(
-                    f"""
-                    <div class="dl-card">
-                        <h4 style="margin: 0 0 0.5rem 0; color: #818CF8;">👥 Parties & Entities</h4>
-                        <p style="color: #F1F5F9; font-size: 0.92rem;">{kd.get('parties', 'Not found')}</p>
-                        
-                        <h4 style="margin: 1rem 0 0.5rem 0; color: #818CF8;">📅 Dates & Effective Term</h4>
-                        <p style="color: #F1F5F9; font-size: 0.92rem;">{kd.get('effective_date', 'Not found')}</p>
-                        
-                        <h4 style="margin: 1rem 0 0.5rem 0; color: #818CF8;">💰 Amounts & Currency</h4>
-                        <p style="color: #F1F5F9; font-size: 0.92rem;">{kd.get('amounts_and_currency', 'Not found')}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                render_html(f"""
+<div class="dl-card dl-card-glow-emerald">
+    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">👥 Parties & Entities</div>
+    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('parties', 'Not found')}</div>
+    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">📅 Dates & Effective Term</div>
+    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('effective_date', 'Not found')}</div>
+    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">💰 Amounts & Currency</div>
+    <div style="color: #F8FAFC; font-size: 0.92rem; line-height: 1.5;">{kd.get('amounts_and_currency', 'Not found')}</div>
+</div>
+""")
             with col_k2:
-                st.markdown(
-                    f"""
-                    <div class="dl-card">
-                        <h4 style="margin: 0 0 0.5rem 0; color: #818CF8;">💳 Payment Terms</h4>
-                        <p style="color: #F1F5F9; font-size: 0.92rem;">{kd.get('payment_terms', 'Not found')}</p>
-                        
-                        <h4 style="margin: 1rem 0 0.5rem 0; color: #818CF8;">⏱️ Deadlines & Milestones</h4>
-                        <p style="color: #F1F5F9; font-size: 0.92rem;">{kd.get('deadlines', 'Not found')}</p>
-                        
-                        <h4 style="margin: 1rem 0 0.5rem 0; color: #818CF8;">📋 Core Responsibilities</h4>
-                        <p style="color: #F1F5F9; font-size: 0.92rem;">{kd.get('responsibilities', 'Not found')}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                render_html(f"""
+<div class="dl-card dl-card-glow-emerald">
+    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">💳 Payment Terms</div>
+    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('payment_terms', 'Not found')}</div>
+    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">⏱️ Deadlines & Milestones</div>
+    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('deadlines', 'Not found')}</div>
+    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">📋 Core Responsibilities</div>
+    <div style="color: #F8FAFC; font-size: 0.92rem; line-height: 1.5;">{kd.get('responsibilities', 'Not found')}</div>
+</div>
+""")
 
         with tab_chat:
             st.markdown("##### 💬 Ask the Document")
@@ -833,7 +824,7 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                 f"""
                 <div class="stat-box">
                     <div class="stat-label">Unassessed Values</div>
-                    <div class="stat-value" style="color: #60A5FA;">{metrics.get('unassessed_count', 0)}</div>
+                    <div class="stat-value" style="color: #2DD4BF;">{metrics.get('unassessed_count', 0)}</div>
                     <div style="font-size: 0.72rem; color: #94A3B8;">Missing/qualitative range</div>
                 </div>
                 """,
@@ -842,7 +833,7 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         st.markdown(
             """
-            <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.8rem; color: #94A3B8; line-height: 1.5;">
+            <div style="background: rgba(14, 20, 17, 0.85); border: 1px solid rgba(0, 229, 153, 0.2); border-radius: 10px; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.8rem; color: #94A3B8; line-height: 1.5;">
                 ℹ️ <strong>Clinical Safety Standard:</strong> 'No abnormal values identified' means only that no validated numeric result was outside its supplied interval.
                 It must never be presented as a declaration that the user is healthy. This application is an educational AI Report Assistant and does not provide clinical diagnoses.
             </div>
@@ -991,7 +982,7 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
                 st.markdown(
                     f"""
-                    <div class="dl-card dl-card-glow-indigo">
+                    <div class="dl-card dl-card-glow-emerald">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <span class="badge-pill badge-source">{cat.upper()}</span>
