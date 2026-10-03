@@ -9,30 +9,51 @@ from typing import Dict, Any, Optional, Tuple, List
 
 from src.config import DEFAULT_GEMINI_MODEL
 
-def get_gemini_api_key(explicit_key: Optional[str] = None) -> Optional[str]:
+def get_gemini_api_key_info(explicit_key: Optional[str] = None) -> Tuple[Optional[str], str]:
     """
-    Resolve Google Gemini API key securely in order:
-    1. Explicitly provided key (e.g. from user sidebar input)
-    2. Streamlit secrets (`st.secrets["GEMINI_API_KEY"]` or `st.secrets["GOOGLE_API_KEY"]`)
-    3. Environment variable (`os.environ["GEMINI_API_KEY"]` or `os.environ["GOOGLE_API_KEY"]`)
+    Returns (api_key, source) where source is 'secrets', 'env', 'ui', or 'none'.
+    Prioritizes Streamlit Secrets so deployed apps seamlessly authenticate
+    without requiring manual entry in the UI.
     """
-    if explicit_key and explicit_key.strip():
-        return explicit_key.strip()
-
+    # 1. Streamlit secrets check (primary for Cloud deployment)
     try:
         import streamlit as st
-        if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
-            return str(st.secrets["GEMINI_API_KEY"]).strip()
-        if "GOOGLE_API_KEY" in st.secrets and st.secrets["GOOGLE_API_KEY"]:
-            return str(st.secrets["GOOGLE_API_KEY"]).strip()
+        for sec_name in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "gemini_api_key", "google_api_key"]:
+            if sec_name in st.secrets and str(st.secrets[sec_name]).strip():
+                val = str(st.secrets[sec_name]).strip()
+                # Ensure it's not a placeholder
+                if not val.startswith("AIzaSy_your_") and not "placeholder" in val.lower():
+                    return val, "secrets"
     except Exception:
         pass
 
-    env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if env_key and env_key.strip():
-        return env_key.strip()
+    # 2. Environment variables check
+    for env_name in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
+        env_val = os.environ.get(env_name)
+        if env_val and env_val.strip():
+            return env_val.strip(), "env"
 
-    return None
+    # 3. Explicit UI key entered in sidebar (optional fallback)
+    if explicit_key and explicit_key.strip():
+        return explicit_key.strip(), "ui"
+
+    return None, "none"
+
+def get_gemini_api_key(explicit_key: Optional[str] = None) -> Optional[str]:
+    """Resolve Google Gemini API key string."""
+    key, _ = get_gemini_api_key_info(explicit_key)
+    return key
+
+def get_default_model_from_secrets() -> str:
+    """Retrieve default model from secrets if specified, otherwise DEFAULT_GEMINI_MODEL."""
+    try:
+        import streamlit as st
+        for sec_name in ["GEMINI_MODEL", "gemini_model"]:
+            if sec_name in st.secrets and str(st.secrets[sec_name]).strip():
+                return str(st.secrets[sec_name]).strip()
+    except Exception:
+        pass
+    return DEFAULT_GEMINI_MODEL
 
 def call_gemini_json_analysis(
     prompt: str,

@@ -33,7 +33,13 @@ from src.config import (
 )
 from src.extractors import extract_document, ExtractedDocument
 from src.deterministic_rules import compute_medical_range, compute_contract_metrics, calculate_quiz_score
-from src.gemini_client import call_gemini_json_analysis, call_gemini_grounded_chat, get_gemini_api_key
+from src.gemini_client import (
+    call_gemini_json_analysis,
+    call_gemini_grounded_chat,
+    get_gemini_api_key,
+    get_gemini_api_key_info,
+    get_default_model_from_secrets
+)
 from src.prompts import (
     get_contract_lens_prompt,
     get_general_doc_prompt,
@@ -84,7 +90,7 @@ def init_session_state():
         "error_message": None,
         "last_raw_prompt": None,
         "custom_gemini_key": "",
-        "selected_model": DEFAULT_GEMINI_MODEL
+        "selected_model": get_default_model_from_secrets()
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -209,27 +215,52 @@ with st.sidebar:
 
     # Gemini Model & API Key Configuration
     st.markdown("##### ⚡ 4. Gemini Configuration")
-    configured_key = get_gemini_api_key(st.session_state.custom_gemini_key)
-    if configured_key:
+    configured_key, key_source = get_gemini_api_key_info(st.session_state.custom_gemini_key)
+    
+    if key_source == "secrets":
         st.markdown(
-            '<div style="font-size: 0.75rem; color: #34D399; margin-bottom: 0.5rem;">'
-            '● Gemini API Key Connected</div>',
+            '<div style="font-size: 0.78rem; color: #34D399; font-weight: 600; margin-bottom: 0.5rem;">'
+            '● Connected via Streamlit Secrets</div>',
+            unsafe_allow_html=True
+        )
+    elif key_source == "env":
+        st.markdown(
+            '<div style="font-size: 0.78rem; color: #34D399; font-weight: 600; margin-bottom: 0.5rem;">'
+            '● Connected via Environment Variable</div>',
+            unsafe_allow_html=True
+        )
+    elif key_source == "ui":
+        st.markdown(
+            '<div style="font-size: 0.78rem; color: #34D399; font-weight: 600; margin-bottom: 0.5rem;">'
+            '● Connected via Custom UI Key</div>',
             unsafe_allow_html=True
         )
     else:
         st.markdown(
-            '<div style="font-size: 0.75rem; color: #F87171; margin-bottom: 0.5rem;">'
-            '● Missing Gemini API Key</div>',
+            '<div style="font-size: 0.78rem; color: #F87171; font-weight: 600; margin-bottom: 0.2rem;">'
+            '● Missing Gemini API Key</div>'
+            '<div style="font-size: 0.72rem; color: #94A3B8; margin-bottom: 0.5rem; line-height: 1.4;">'
+            'On Streamlit Cloud: add <code>GEMINI_API_KEY</code> in Secrets. Or enter below.</div>',
             unsafe_allow_html=True
         )
 
     with st.expander("API Key & Model Settings"):
-        user_key = st.text_input(
-            "Gemini API Key",
-            type="password",
-            value=st.session_state.custom_gemini_key,
-            placeholder="AIzaSy..."
-        )
+        if key_source in ["secrets", "env"]:
+            st.success("✅ GEMINI_API_KEY is active from Secrets. No manual entry needed!")
+            user_key = st.text_input(
+                "Override Key (Optional)",
+                type="password",
+                value=st.session_state.custom_gemini_key,
+                placeholder="Leave blank to use Secrets"
+            )
+        else:
+            user_key = st.text_input(
+                "Gemini API Key",
+                type="password",
+                value=st.session_state.custom_gemini_key,
+                placeholder="AIzaSy..."
+            )
+
         if user_key != st.session_state.custom_gemini_key:
             st.session_state.custom_gemini_key = user_key
             st.rerun()
@@ -421,9 +452,17 @@ if st.session_state.extracted_doc:
             unsafe_allow_html=True
         )
 
+        if not configured_key:
+            st.warning("🔑 **Gemini API Key Required:** Please add `GEMINI_API_KEY` to your Streamlit Secrets (or enter it in the left sidebar settings).")
+
         col_act, col_retry = st.columns([2, 1])
         with col_act:
-            analyze_clicked = st.button("🚀 Analyze Document", type="primary", use_container_width=True)
+            analyze_clicked = st.button(
+                "🚀 Analyze Document",
+                type="primary",
+                use_container_width=True,
+                disabled=not bool(configured_key)
+            )
         with col_retry:
             if st.session_state.app_state == "service_error":
                 retry_clicked = st.button("🔄 Retry Analysis", use_container_width=True)
