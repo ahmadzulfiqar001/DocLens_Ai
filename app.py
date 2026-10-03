@@ -272,21 +272,26 @@ with st.sidebar:
 
     with c_btn2:
         if st.session_state.analysis_data and st.session_state.extracted_doc:
-            report_text = generate_txt_report(
-                extracted_doc=st.session_state.extracted_doc,
-                mode=st.session_state.active_mode,
-                language=st.session_state.active_language,
-                analysis_data=st.session_state.analysis_data,
-                deterministic_metrics=st.session_state.deterministic_metrics
-            )
-            st.download_button(
-                label="📥 Export",
-                data=report_text.encode("utf-8"),
-                file_name=f"DocuLens_{st.session_state.extracted_doc.filename}_Analysis.txt",
-                mime="text/plain; charset=utf-8",
-                use_container_width=True,
-                help="Download full UTF-8 analysis report"
-            )
+            try:
+                fname = getattr(st.session_state.extracted_doc, "filename", "document")
+                report_text = generate_txt_report(
+                    filename=fname,
+                    mode=st.session_state.active_mode,
+                    language=st.session_state.active_language,
+                    analysis_data=st.session_state.analysis_data,
+                    deterministic_metrics=st.session_state.deterministic_metrics,
+                    extracted_doc=st.session_state.extracted_doc
+                )
+                st.download_button(
+                    label="📥 Export",
+                    data=report_text.encode("utf-8"),
+                    file_name=f"DocuLens_{fname}_Analysis.txt",
+                    mime="text/plain; charset=utf-8",
+                    use_container_width=True,
+                    help="Download full UTF-8 analysis report"
+                )
+            except Exception as exp_err:
+                st.button("📥 Export", disabled=True, use_container_width=True, help="Report export temporarily unavailable")
         else:
             st.button("📥 Export", disabled=True, use_container_width=True)
 

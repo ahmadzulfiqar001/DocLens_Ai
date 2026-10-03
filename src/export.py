@@ -5,13 +5,28 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 def generate_txt_report(
-    filename: str,
-    mode: str,
-    language: str,
-    analysis_data: Dict[str, Any],
-    deterministic_metrics: Dict[str, Any]
+    filename: Any = None,
+    mode: str = "Document Lens",
+    language: str = "Simple English",
+    analysis_data: Any = None,
+    deterministic_metrics: Any = None,
+    extracted_doc: Any = None,
+    **kwargs
 ) -> str:
     """Generates a complete, structured, human-readable UTF-8 text report."""
+    # Resolve filename whether passed as string, extracted_doc keyword, or object
+    if extracted_doc is not None:
+        resolved_filename = getattr(extracted_doc, "filename", str(extracted_doc))
+    elif filename is not None:
+        resolved_filename = getattr(filename, "filename", str(filename))
+    else:
+        resolved_filename = "document"
+
+    if analysis_data is None:
+        analysis_data = {}
+    if deterministic_metrics is None:
+        deterministic_metrics = {}
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = []
 
@@ -19,7 +34,7 @@ def generate_txt_report(
     lines.append("=" * 78)
     lines.append(" DOCULENS AI - INTELLIGENT DOCUMENT ANALYSIS REPORT")
     lines.append("=" * 78)
-    lines.append(f"Source File       : {filename}")
+    lines.append(f"Source File       : {resolved_filename}")
     lines.append(f"Analysis Mode     : {mode}")
     lines.append(f"Output Language   : {language}")
     lines.append(f"Report Generated  : {timestamp}")
