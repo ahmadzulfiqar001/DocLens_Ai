@@ -256,24 +256,9 @@ section[data-testid="stSidebar"] {
 </style>
 """
 
-# Static Avatar SVG (AI Medical / Report Assistant)
-STATIC_AI_ASSISTANT_AVATAR_SVG = """<svg width="64" height="64" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="34" cy="34" r="32" fill="url(#avatar_grad)" stroke="#00E599" stroke-width="2.5"/><circle cx="34" cy="34" r="28" fill="#0A110E"/><path d="M34 18V36M34 36C34 41 38 45 43 45C48 45 52 41 52 36V28" stroke="#34D399" stroke-width="2.5" stroke-linecap="round"/><path d="M34 36C34 41 30 45 25 45C20 45 16 41 16 36V28" stroke="#34D399" stroke-width="2.5" stroke-linecap="round"/><rect x="30" y="24" width="8" height="8" rx="2" fill="#00E599"/><path d="M34 22V34M28 28H40" stroke="#041B12" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="26" r="3" fill="#2DD4BF"/><circle cx="52" cy="26" r="3" fill="#2DD4BF"/><defs><linearGradient id="avatar_grad" x1="0" y1="0" x2="68" y2="68" gradientUnits="userSpaceOnUse"><stop stop-color="#00E599"/><stop offset="0.5" stop-color="#14B8A6"/><stop offset="1" stop-color="#059669"/></linearGradient></defs></svg>"""
 
-def render_sidebar_header(app_name: str, app_version: str) -> str:
-    """Renders the high-contrast logo and branding in the Streamlit sidebar without markdown split hazard."""
-    logo_uri = get_logo_data_uri()
-    img_html = f'<img src="{logo_uri}" width="38" height="38" style="vertical-align:middle;border-radius:8px;" />' if logo_uri else '🔍'
-    return f"""<div style="display:flex;align-items:center;gap:10px;padding:4px 0 12px 0;"><div style="flex-shrink:0;">{img_html}</div><div><div style="font-size:1.32rem;font-weight:800;color:#FFFFFF;line-height:1.2;">Docu<span style="color:#00E599;">Lens</span> <span style="font-size:0.65rem;background:rgba(0,229,153,0.18);color:#00E599;padding:2px 5px;border-radius:4px;border:1px solid rgba(0,229,153,0.35);font-weight:800;vertical-align:middle;">AI</span></div><div style="font-size:0.72rem;color:#94A3B8;margin-top:2px;">v{app_version} • Grounded Document Intelligence</div></div></div>"""
 
-def render_hero_banner(active_mode: str, active_language: str, app_tagline: str) -> str:
-    """Renders the top application hero banner without markdown split hazard."""
-    logo_uri = get_logo_data_uri()
-    img_html = f'<img src="{logo_uri}" width="46" height="46" style="vertical-align:middle;border-radius:10px;" />' if logo_uri else '🔍'
-    return f"""<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;"><div style="flex-shrink:0;">{img_html}</div><div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h1 style="margin:0;font-size:2rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;line-height:1.2;">{active_mode}</h1><span class="badge-pill badge-source">{active_language}</span></div><p style="margin:3px 0 0 0;color:#94A3B8;font-size:0.88rem;">{app_tagline}</p></div></div>"""
 
-def render_medical_avatar_banner():
-    """Renders the static AI Report Assistant avatar banner compliant with PRD Section 4."""
-    return f"""<div class="avatar-header"><div style="flex-shrink:0;">{STATIC_AI_ASSISTANT_AVATAR_SVG}</div><div style="flex-grow:1;"><div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.2rem;"><span style="font-size:1.15rem;font-weight:700;color:#FFFFFF;">AI Report Assistant</span><span class="avatar-badge-tag">AI Powered • Non-Diagnostic</span></div><p style="margin:0;font-size:0.82rem;color:#94A3B8;line-height:1.4;">Objective laboratory observations and educational test explanations. Does not diagnose health conditions, prescribe therapy, or replace consultation with a qualified clinical physician.</p></div></div>"""
 
 def render_priority_badge(priority: str):
     """Renders a native Streamlit badge for review priority without any raw HTML leakage."""
@@ -336,40 +321,4 @@ def render_medical_comparison_badge(comparison: str, has_conflict: bool = False)
         else:
             st.caption("❓ Cannot assess from range")
 
-def get_priority_badge(priority: str) -> str:
-    """Returns an HTML badge pill for review priority."""
-    p_clean = priority.strip().lower()
-    if p_clean == "high":
-        return '<span class="badge-pill badge-high">⚠️ High Priority</span>'
-    elif p_clean == "medium":
-        return '<span class="badge-pill badge-med">⚖️ Medium Priority</span>'
-    elif p_clean == "low":
-        return '<span class="badge-pill badge-low">ℹ️ Low Priority</span>'
-    elif "no flagged" in p_clean:
-        return '<span class="badge-pill badge-clear">✅ No Flagged Issues</span>'
-    else:
-        return f'<span class="badge-pill badge-low">{priority}</span>'
 
-def get_medical_comparison_badge(comparison: str, has_conflict: bool = False) -> str:
-    """Returns a styled HTML badge pill for medical range results."""
-    comp_clean = comparison.strip().lower()
-    if has_conflict:
-        return f'<span class="badge-pill badge-high" title="Conflict between lab flag and numeric range">⚡ {comparison} (Conflict)</span>'
-    if "above" in comp_clean:
-        return '<span class="badge-pill badge-high">🔺 Above range</span>'
-    elif "below" in comp_clean:
-        return '<span class="badge-pill badge-med">🔻 Below range</span>'
-    elif "within" in comp_clean:
-        return '<span class="badge-pill badge-clear">✓ Within range</span>'
-    else:
-        return '<span class="badge-pill badge-low">❓ Cannot assess from range</span>'
-
-def render_html(html_str: str):
-    """Safely renders HTML without Markdown indentation or code block interpretation."""
-    import textwrap
-    import streamlit as st
-    clean_html = textwrap.dedent(html_str).strip()
-    if hasattr(st, "html"):
-        st.html(clean_html)
-    else:
-        st.markdown(clean_html, unsafe_allow_html=True)
