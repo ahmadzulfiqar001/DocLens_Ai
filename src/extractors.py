@@ -1,12 +1,13 @@
 """Document text extraction engine with source preservation and limit enforcement.
-Complies with PRD C01 and C02 requirements.
+Supports PDF (up to 500 pages, including scanned pages), DOCX, TXT, MD,
+and image formats (JPEG, JPG, PNG, WEBP) with multimodal transcription.
 """
 import io
 import hashlib
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
-from src.config import MAX_FILE_SIZE_BYTES, MAX_PDF_PAGES, MAX_EXTRACTED_CHARS, SUPPORTED_EXTENSIONS
+from src.config import MAX_FILE_SIZE_BYTES, MAX_PDF_PAGES, MAX_EXTRACTED_CHARS, SUPPORTED_EXTENSIONS, IMAGE_EXTENSIONS
 
 @dataclass
 class SourceSection:
@@ -33,22 +34,21 @@ def compute_sha256(data: bytes) -> str:
 
 def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[ExtractedDocument], Optional[str]]:
     """
-    Validate and extract text from PDF, DOCX, or TXT file.
-    Enforces 10 MB file size limit, 15 PDF pages limit, and 25,000 characters limit.
-    Preserves valid source identifiers ([Page X] or [Para X]).
+    Validate and extract text from PDF, DOCX, TXT, or Image files.
+    Preserves valid source identifiers ([Page X] or [Para X] or [Section X]).
     Returns: (ExtractedDocument, None) if successful, or (None, error_message).
     """
     if not file_bytes or len(file_bytes) == 0:
         return None, "The uploaded file is empty (0 bytes). Please upload a valid document."
 
-    # Size check (PRD C01: up to 10 MB)
+    # Size check (up to 50 MB)
     if len(file_bytes) > MAX_FILE_SIZE_BYTES:
         size_mb = len(file_bytes) / (1024 * 1024)
-        return None, f"File size ({size_mb:.1f} MB) exceeds the maximum allowed limit of 10 MB."
+        return None, f"File size ({size_mb:.1f} MB) exceeds the maximum allowed limit of 50 MB."
 
     file_ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if file_ext not in SUPPORTED_EXTENSIONS:
-        return None, f"Unsupported file format '{file_ext}'. Supported formats are: PDF, DOCX, and TXT."
+        return None, f"Unsupported file format '{file_ext}'. Supported formats: PDF, DOCX, TXT, MD, and Images (JPEG, PNG, WEBP)."
 
     file_hash = compute_sha256(file_bytes)
     sections: List[SourceSection] = []
@@ -56,11 +56,15 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
     formatting_warnings: List[str] = []
 
     try:
+        # =====================================================================
+        # 1. PDF Documents (Selectable + Scanned OCR)
+        # =====================================================================
         if file_ext == "pdf":
             try:
                 import pymupdf as fitz
             except ImportError:
                 import fitz
+
             try:
                 pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
             except Exception as e:
@@ -71,21 +75,15 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
 
             total_pages = pdf_doc.page_count
             if total_pages > MAX_PDF_PAGES:
-                return None, (
-                    f"The PDF contains {total_pages} pages, which exceeds the MVP limit of {MAX_PDF_PAGES} pages. "
-                    f"Please submit a document of {MAX_PDF_PAGES} pages or fewer."
-                )
+                return None, f"The PDF contains {total_pages} pages, which exceeds the limit of {MAX_PDF_PAGES} pages."
 
             extracted_chars = 0
+            scanned_pages = []
+
             for page_idx in range(total_pages):
                 page = pdf_doc.load_page(page_idx)
                 page_text = page.get_text("text").strip()
                 page_num = page_idx + 1
-
-                # Check for tables or vector drawings that might be complex
-                drawing_count = len(page.get_drawings())
-                if drawing_count > 50 and not page_text:
-                    formatting_warnings.append(f"Page {page_num}: Complex graphics detected without extractable text.")
 
                 if page_text:
                     sections.append(SourceSection(
@@ -95,19 +93,52 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
                         section_index=page_num
                     ))
                     extracted_chars += len(page_text)
+                else:
+                    scanned_pages.append((page_num, page))
 
-            if extracted_chars < 40:
+            # If PDF has minimal selectable text, attempt image transcription on scanned pages
+            if extracted_chars < 40 and scanned_pages:
+                from src.gemini_client import get_gemini_api_key
+                from google import genai
+                api_key = get_gemini_api_key()
+                if api_key:
+                    client = genai.Client(api_key=api_key)
+                    for page_num, p in scanned_pages[:10]:
+                        try:
+                            pix = p.get_pixmap(dpi=150)
+                            img_data = pix.tobytes("jpeg")
+                            part = genai.types.Part.from_bytes(data=img_data, mime_type="image/jpeg")
+                            resp = client.models.generate_content(
+                                model="gemini-flash-lite-latest",
+                                contents=[part, "Transcribe all text from this scanned page verbatim. Preserve numbers, headers, and tables."]
+                            )
+                            p_transcribed = resp.text.strip() if resp.text else ""
+                            if p_transcribed:
+                                sections.append(SourceSection(
+                                    source_id=f"Page {page_num} (OCR)",
+                                    text=p_transcribed,
+                                    page_num=page_num,
+                                    section_index=page_num
+                                ))
+                                extracted_chars += len(p_transcribed)
+                        except Exception:
+                            continue
+
+            if extracted_chars < 20 and not sections:
                 return None, (
-                    "The uploaded PDF does not contain sufficient selectable text (less than 40 characters extracted). "
-                    "It appears to be an image-only scan or unsupported format. DocuLens AI MVP requires readable text."
+                    "The uploaded PDF does not contain sufficient readable text or OCR content. "
+                    "Please ensure the document contains clear text or upload a higher resolution document."
                 )
 
-        elif file_ext == "docx":
+        # =====================================================================
+        # 2. Word Documents (.docx, .doc)
+        # =====================================================================
+        elif file_ext in ["docx", "doc"]:
             import docx
             try:
                 doc = docx.Document(io.BytesIO(file_bytes))
             except Exception as e:
-                return None, f"Failed to open DOCX file. File may be corrupted or encrypted. ({str(e)})"
+                return None, f"Failed to open Word file. File may be corrupted or encrypted. ({str(e)})"
 
             para_count = 0
             for p in doc.paragraphs:
@@ -121,7 +152,6 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
                         section_index=para_count
                     ))
 
-            # Extract tables if present
             table_idx = 0
             for table in doc.tables:
                 table_idx += 1
@@ -139,12 +169,14 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
                     ))
 
             if not sections:
-                return None, "The uploaded DOCX file does not contain any readable text paragraphs or tables."
+                return None, "The uploaded Word document does not contain any readable text paragraphs or tables."
 
-        elif file_ext == "txt":
-            # Attempt UTF-8 decoding
+        # =====================================================================
+        # 3. Plain Text & Markdown (.txt, .md)
+        # =====================================================================
+        elif file_ext in ["txt", "md"]:
             raw_text = None
-            for enc in ["utf-8", "utf-8-sig", "latin-1"]:
+            for enc in ["utf-8", "utf-8-sig", "latin-1", "cp1252"]:
                 try:
                     raw_text = file_bytes.decode(enc)
                     break
@@ -152,16 +184,14 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
                     continue
 
             if raw_text is None:
-                return None, "The TXT file could not be decoded. Please ensure it is saved as UTF-8 encoded text."
+                return None, "The text file could not be decoded. Please ensure it is saved as UTF-8 encoded text."
 
-            # Split into natural paragraphs or blocks
             paragraphs = [p.strip() for p in raw_text.split("\n\n") if p.strip()]
             if not paragraphs:
                 paragraphs = [line.strip() for line in raw_text.splitlines() if line.strip()]
 
             para_count = 0
             for p in paragraphs:
-                # Check if text already has custom source marks like [Para X] or [Page X]
                 para_count += 1
                 sections.append(SourceSection(
                     source_id=f"Para {para_count}",
@@ -171,7 +201,46 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
                 ))
 
             if not sections:
-                return None, "The TXT file contains no readable text."
+                return None, "The text file contains no readable text."
+
+        # =====================================================================
+        # 4. Images (JPEG, JPG, PNG, WEBP) via Multimodal Gemini
+        # =====================================================================
+        elif file_ext in IMAGE_EXTENSIONS:
+            from src.gemini_client import get_gemini_api_key
+            from google import genai
+            api_key = get_gemini_api_key()
+            if not api_key:
+                return None, "Gemini API Key is required to process image files (JPEG/PNG/WEBP). Please configure GEMINI_API_KEY in Secrets."
+
+            mime_type = "image/jpeg" if file_ext in ["jpeg", "jpg"] else f"image/{file_ext}"
+            client = genai.Client(api_key=api_key)
+            part = genai.types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+
+            resp = client.models.generate_content(
+                model="gemini-flash-lite-latest",
+                contents=[
+                    part,
+                    "Transcribe all readable text, labels, test names, numbers, values, and tables from this document image verbatim. "
+                    "Preserve original wording and structure. Do not summarize or explain."
+                ]
+            )
+            img_text = resp.text.strip() if resp.text else ""
+            if not img_text or len(img_text) < 10:
+                return None, "Unable to extract readable text from the uploaded image. Please ensure the image is clear and well-lit."
+
+            paras = [p.strip() for p in img_text.split("\n\n") if p.strip()]
+            if not paras:
+                paras = [p.strip() for p in img_text.splitlines() if p.strip()]
+
+            for p_idx, p_text in enumerate(paras, 1):
+                sections.append(SourceSection(
+                    source_id=f"Section {p_idx}",
+                    text=p_text,
+                    page_num=1,
+                    section_index=p_idx
+                ))
+            total_pages = 1
 
     except Exception as e:
         return None, f"An unexpected error occurred during extraction: {str(e)}"
@@ -184,7 +253,7 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
         formatted_parts.append(part)
         total_chars += len(s.text)
 
-    # Limit check (PRD C02: 25,000 characters maximum)
+    # Limit check (expanded to 250,000 characters)
     if total_chars > MAX_EXTRACTED_CHARS:
         return None, (
             f"The document text ({total_chars:,} characters) exceeds the maximum limit of {MAX_EXTRACTED_CHARS:,} characters. "
@@ -205,4 +274,3 @@ def extract_document(file_bytes: bytes, filename: str) -> Tuple[Optional[Extract
         preview_snippet=preview_snippet,
         formatting_warnings=formatting_warnings
     ), None
-

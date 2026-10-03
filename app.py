@@ -1,6 +1,8 @@
 """DocuLens AI - Production Streamlit Application
 Entrypoint: app.py
-Complies with PRD requirements for Document Lens, Medical Lens, and Study Lens.
+Grounded Document Intelligence for Document Lens, Medical Lens, and Study Lens.
+Engineered with clean, robust native components, high-contrast dark theme,
+and universal multi-format upload (PDF up to 500 pages, Word, TXT, and Images).
 """
 import os
 import json
@@ -29,7 +31,8 @@ from src.config import (
     AVAILABLE_GEMINI_MODELS,
     MAX_FILE_SIZE_BYTES,
     MAX_PDF_PAGES,
-    MAX_EXTRACTED_CHARS
+    MAX_EXTRACTED_CHARS,
+    SUPPORTED_EXTENSIONS
 )
 from src.extractors import extract_document, ExtractedDocument
 from src.deterministic_rules import compute_medical_range, compute_contract_metrics, calculate_quiz_score
@@ -50,32 +53,31 @@ from src.prompts import (
 from src.export import generate_txt_report
 from src.ui_components import (
     CUSTOM_CSS,
-    render_medical_avatar_banner,
-    render_sidebar_header,
-    render_hero_banner,
-    render_html,
-    get_priority_badge,
-    get_medical_comparison_badge
+    render_priority_badge,
+    render_medical_comparison_badge
 )
 
 # -----------------------------------------------------------------------------
 # Streamlit Page Setup
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title=f"{APP_NAME} | Multi-Lens Document Intelligence",
+    page_title=f"{APP_NAME} | Document Intelligence",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Inject custom CSS
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+# Inject custom atmospheric CSS
+if hasattr(st, "html"):
+    st.html(CUSTOM_CSS)
+else:
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# Session State Management & Isolation (PRD Section 2, 6 & Acceptance A08, A10)
+# Session State Management & Isolation
 # -----------------------------------------------------------------------------
 def init_session_state():
-    """Initialize default session state keys if not already present."""
+    """Initialize default session state keys."""
     defaults = {
         "active_mode": MODE_DOC_LENS,
         "active_subtype": DOC_SUBTYPE_CONTRACT,
@@ -89,9 +91,8 @@ def init_session_state():
         "quiz_submitted": False,
         "quiz_user_answers": {},
         "quiz_results": {},
-        "app_state": "empty",  # empty, validating, extracting, analyzing, ready, unsupported_input, service_error
+        "app_state": "empty",  # empty, extracting, ready_for_analysis, analyzing, ready, unsupported_input, service_error
         "error_message": None,
-        "last_raw_prompt": None,
         "custom_gemini_key": "",
         "selected_model": get_default_model_from_secrets()
     }
@@ -102,7 +103,7 @@ def init_session_state():
 init_session_state()
 
 def clear_session():
-    """PRD C05 & A10: Clear all app-held content, chat, quiz, and extracted state."""
+    """Reset all app-held content, chat, quiz, and extracted state."""
     st.session_state.active_file_hash = None
     st.session_state.active_filename = None
     st.session_state.extracted_doc = None
@@ -116,10 +117,7 @@ def clear_session():
     st.session_state.error_message = None
 
 def check_context_invalidation(new_file_hash: Optional[str], new_mode: str, new_language: str):
-    """
-    PRD C03, C04 & A08:
-    A file, mode, or language change invalidates earlier analysis, chat, and quiz state.
-    """
+    """A file, mode, or language change invalidates earlier analysis, chat, and quiz state."""
     state_changed = False
     if st.session_state.active_file_hash != new_file_hash:
         state_changed = True
@@ -141,13 +139,20 @@ def check_context_invalidation(new_file_hash: Optional[str], new_mode: str, new_
 # Sidebar Navigation & Settings
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown(
-        render_sidebar_header(APP_NAME, APP_VERSION),
-        unsafe_allow_html=True
-    )
+    # Clean Brand Header
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo.svg")
+    col_sb_logo, col_sb_text = st.columns([1, 4])
+    with col_sb_logo:
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=42)
+        else:
+            st.markdown("🔍")
+    with col_sb_text:
+        st.markdown(f"### {APP_NAME}")
+    st.caption(f"v{APP_VERSION} • Grounded Document Intelligence")
     st.divider()
 
-    # Mode Selector
+    # 1. Mode Selector
     st.markdown("##### 🎯 1. Select Analysis Lens")
     selected_mode = st.radio(
         "Analysis Mode",
@@ -156,10 +161,10 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    # Document Lens Subtype (PRD: Must not silently infer legal category)
+    # Document Lens Subtype
     selected_subtype = st.session_state.active_subtype
     if selected_mode == MODE_DOC_LENS:
-        st.markdown("<div style='font-size: 0.8rem; font-weight: 600; color: #CBD5E1; margin: 0.5rem 0 0.2rem 0;'>Document Type:</div>", unsafe_allow_html=True)
+        st.caption("Document Type:")
         selected_subtype = st.selectbox(
             "Document Subtype",
             options=DOC_SUBTYPES,
@@ -168,7 +173,7 @@ with st.sidebar:
         )
         st.session_state.active_subtype = selected_subtype
 
-    # Language Selector (PRD C03)
+    # 2. Language Selector
     st.markdown("##### 🌐 2. Output Language")
     selected_language = st.selectbox(
         "Output Language",
@@ -177,7 +182,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    # Check for mode or language change invalidation
+    # Invalidate on mode/language change
     if selected_mode != st.session_state.active_mode or selected_language != st.session_state.active_language:
         check_context_invalidation(st.session_state.active_file_hash, selected_mode, selected_language)
         st.session_state.active_mode = selected_mode
@@ -186,7 +191,7 @@ with st.sidebar:
 
     st.divider()
 
-    # Demo Fixture Quick Loader
+    # 3. Demo Fixture Quick Loader
     st.markdown("##### 📁 3. Or Load Demo Fixture")
     fixture_files = {
         "None (Use File Uploader)": None,
@@ -206,40 +211,23 @@ with st.sidebar:
 
     st.divider()
 
-    # Gemini Model & API Key Configuration
+    # 4. Gemini Configuration
     st.markdown("##### ⚡ 4. Gemini Configuration")
     configured_key, key_source = get_gemini_api_key_info(st.session_state.custom_gemini_key)
-    
+
     if key_source == "secrets":
-        st.markdown(
-            '<div style="font-size: 0.78rem; color: #34D399; font-weight: 600; margin-bottom: 0.5rem;">'
-            '● Connected via Streamlit Secrets</div>',
-            unsafe_allow_html=True
-        )
+        st.success("● Connected via Streamlit Secrets")
     elif key_source == "env":
-        st.markdown(
-            '<div style="font-size: 0.78rem; color: #34D399; font-weight: 600; margin-bottom: 0.5rem;">'
-            '● Connected via Environment Variable</div>',
-            unsafe_allow_html=True
-        )
+        st.success("● Connected via Environment Variable")
     elif key_source == "ui":
-        st.markdown(
-            '<div style="font-size: 0.78rem; color: #34D399; font-weight: 600; margin-bottom: 0.5rem;">'
-            '● Connected via Custom UI Key</div>',
-            unsafe_allow_html=True
-        )
+        st.success("● Connected via Custom UI Key")
     else:
-        st.markdown(
-            '<div style="font-size: 0.78rem; color: #F87171; font-weight: 600; margin-bottom: 0.2rem;">'
-            '● Missing Gemini API Key</div>'
-            '<div style="font-size: 0.72rem; color: #94A3B8; margin-bottom: 0.5rem; line-height: 1.4;">'
-            'On Streamlit Cloud: add <code>GEMINI_API_KEY</code> in Secrets. Or enter below.</div>',
-            unsafe_allow_html=True
-        )
+        st.error("● Missing Gemini API Key")
+        st.caption("On Streamlit Cloud: add GEMINI_API_KEY in Secrets. Or enter below.")
 
     with st.expander("API Key & Model Settings"):
         if key_source in ["secrets", "env"]:
-            st.success("✅ GEMINI_API_KEY is active from Secrets. No manual entry needed!")
+            st.info("GEMINI_API_KEY is active from Secrets. No manual entry needed.")
             user_key = st.text_input(
                 "Override Key (Optional)",
                 type="password",
@@ -258,26 +246,34 @@ with st.sidebar:
             st.session_state.custom_gemini_key = user_key
             st.rerun()
 
-        model_choice = st.selectbox(
+        model_options = AVAILABLE_GEMINI_MODELS
+        curr_model = st.session_state.selected_model
+        if curr_model not in model_options:
+            model_options = [curr_model] + model_options
+
+        sel_model = st.selectbox(
             "Gemini Model",
-            options=AVAILABLE_GEMINI_MODELS,
-            index=AVAILABLE_GEMINI_MODELS.index(st.session_state.selected_model) if st.session_state.selected_model in AVAILABLE_GEMINI_MODELS else 0
+            options=model_options,
+            index=model_options.index(curr_model) if curr_model in model_options else 0
         )
-        st.session_state.selected_model = model_choice
+        if sel_model != st.session_state.selected_model:
+            st.session_state.selected_model = sel_model
+            st.rerun()
 
     st.divider()
 
-    # Session Reset & Controls
-    col_reset, col_down = st.columns([1, 1])
-    with col_reset:
-        if st.button("🗑️ Clear", use_container_width=True, help="Reset session and delete in-memory data"):
+    # Session Reset & Export
+    st.markdown("##### ⚙️ Session Controls")
+    c_btn1, c_btn2 = st.columns(2)
+    with c_btn1:
+        if st.button("🔄 Reset", use_container_width=True, help="Clear active document and start fresh"):
             clear_session()
             st.rerun()
 
-    with col_down:
-        if st.session_state.analysis_data is not None and st.session_state.extracted_doc is not None:
+    with c_btn2:
+        if st.session_state.analysis_data and st.session_state.extracted_doc:
             report_text = generate_txt_report(
-                filename=st.session_state.extracted_doc.filename,
+                extracted_doc=st.session_state.extracted_doc,
                 mode=st.session_state.active_mode,
                 language=st.session_state.active_language,
                 analysis_data=st.session_state.analysis_data,
@@ -298,36 +294,48 @@ with st.sidebar:
 # Main Application Content
 # -----------------------------------------------------------------------------
 
-# Top Header Banner
+# Top Header Banner (Clean Native Layout)
 header_col1, header_col2 = st.columns([3, 1])
 with header_col1:
-    st.markdown(
-        render_hero_banner(
-            st.session_state.active_mode,
-            st.session_state.active_language,
-            APP_TAGLINE
-        ),
-        unsafe_allow_html=True
-    )
+    h_col_logo, h_col_text = st.columns([1, 8])
+    with h_col_logo:
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=48)
+        else:
+            st.markdown("🔍")
+    with h_col_text:
+        st.markdown(f"## {st.session_state.active_mode}")
+        st.caption(f"{APP_TAGLINE} • Language: **{st.session_state.active_language}**")
 
 with header_col2:
-    state_pill_map = {
-        "empty": '<span class="badge-pill badge-low">⚪ Waiting for Document</span>',
-        "validating": '<span class="badge-pill badge-med">🟡 Validating File</span>',
-        "extracting": '<span class="badge-pill badge-med">⚙️ Extracting Sources</span>',
-        "analyzing": '<span class="badge-pill badge-high">✨ AI Analyzing...</span>',
-        "ready": '<span class="badge-pill badge-clear">🟢 Analysis Ready</span>',
-        "ready_for_analysis": '<span class="badge-pill badge-low">📄 Extracted • Ready</span>',
-        "unsupported_input": '<span class="badge-pill badge-high">❌ Unsupported Input</span>',
-        "service_error": '<span class="badge-pill badge-high">⚠️ Service Error</span>'
+    status_map = {
+        "empty": "⚪ Waiting for Document",
+        "validating": "🟡 Validating File",
+        "extracting": "⚙️ Extracting Sources",
+        "analyzing": "✨ AI Analyzing...",
+        "ready": "🟢 Analysis Ready",
+        "ready_for_analysis": "📄 Extracted • Ready",
+        "unsupported_input": "❌ Unsupported Input",
+        "service_error": "⚠️ Service Error"
     }
     cur_state = st.session_state.app_state
-    pill_html = state_pill_map.get(cur_state, state_pill_map["empty"])
-    st.markdown(f"<div style='text-align: right; padding-top: 0.5rem;'>{pill_html}</div>", unsafe_allow_html=True)
+    st.info(f"**Status:** {status_map.get(cur_state, 'Ready')}")
 
-# Medical Lens Static Avatar Banner (PRD Section 4)
+# Medical Lens Static Avatar Banner (PRD Section 4 - Clean Container)
 if st.session_state.active_mode == MODE_MEDICAL_LENS:
-    st.markdown(render_medical_avatar_banner(), unsafe_allow_html=True)
+    with st.container(border=True):
+        col_med_icon, col_med_text = st.columns([1, 8])
+        with col_med_icon:
+            if os.path.exists(logo_path):
+                st.image(logo_path, width=54)
+            else:
+                st.markdown("🩺")
+        with col_med_text:
+            st.subheader("AI Report Assistant • Non-Diagnostic")
+            st.caption(
+                "Objective laboratory observations and educational test explanations. "
+                "Does not diagnose health conditions, prescribe therapy, or replace consultation with a qualified clinical physician."
+            )
 
 # -----------------------------------------------------------------------------
 # Document Upload & Ingestion Section
@@ -335,12 +343,12 @@ if st.session_state.active_mode == MODE_MEDICAL_LENS:
 file_bytes_to_process = None
 filename_to_process = None
 
-# Primary File Uploader (Always available)
+# Primary File Uploader (Always accessible & expanded limits)
 uploaded_file = st.file_uploader(
-    "Upload a document (PDF, DOCX, or TXT — Max 10 MB, 15 PDF pages)",
-    type=["pdf", "docx", "txt"],
+    "Upload any Document or Image (PDF, Word DOCX/DOC, TXT, MD, JPEG, JPG, PNG, WEBP — up to 50 MB, no 15-page limit)",
+    type=["pdf", "docx", "doc", "txt", "md", "jpeg", "jpg", "png", "webp"],
     key="main_file_uploader",
-    help="Upload text-based lecture notes, agreements, or medical reports."
+    help="Upload contracts, medical lab reports/photos, lecture notes, or textbooks."
 )
 
 if uploaded_file is not None:
@@ -354,13 +362,11 @@ elif chosen_fixture_name != "None (Use File Uploader)" and fixture_files.get(cho
             file_bytes_to_process = f.read()
         filename_to_process = os.path.basename(abs_path)
 
-# -----------------------------------------------------------------------------
-# Extraction & Pre-Analysis Validation (PRD C01, C02)
-# -----------------------------------------------------------------------------
+# Extraction & Pre-Analysis Validation
 if file_bytes_to_process and filename_to_process:
     from src.extractors import compute_sha256
     incoming_hash = compute_sha256(file_bytes_to_process)
-    
+
     if st.session_state.active_file_hash != incoming_hash:
         st.session_state.active_file_hash = incoming_hash
         st.session_state.active_filename = filename_to_process
@@ -384,18 +390,18 @@ if file_bytes_to_process and filename_to_process:
 
 if st.session_state.app_state == "unsupported_input" and st.session_state.error_message:
     st.error(f"❌ Input Validation Error: {st.session_state.error_message}")
-    st.info("💡 Guidance: Please upload an unencrypted, text-based PDF (under 15 pages), standard DOCX, or UTF-8 TXT under 10 MB and 25,000 characters.")
+    st.info("💡 Guidance: Please upload an unencrypted PDF, Word document, TXT, or Image (JPEG/PNG) under 50 MB.")
 
 if st.session_state.extracted_doc:
     doc = st.session_state.extracted_doc
     with st.expander(f"📑 Document Extracted: {doc.filename} ({doc.total_chars:,} chars, {len(doc.sections)} sections)", expanded=(st.session_state.analysis_data is None)):
         meta_col1, meta_col2, meta_col3 = st.columns(3)
         with meta_col1:
-            st.markdown(f"**Format:** `{doc.file_type.upper()}`")
+            st.metric("Format", doc.file_type.upper())
         with meta_col2:
-            st.markdown(f"**Sections / Sources:** `{len(doc.sections)}`")
+            st.metric("Sections / Sources", len(doc.sections))
         with meta_col3:
-            st.markdown(f"**Character Count:** `{doc.total_chars:,} / 25,000`")
+            st.metric("Character Count", f"{doc.total_chars:,}")
 
         if doc.formatting_warnings:
             for w in doc.formatting_warnings:
@@ -408,12 +414,7 @@ if st.session_state.extracted_doc:
             disabled=True
         )
 
-        st.markdown(
-            '<div style="font-size: 0.75rem; color: #94A3B8; margin-top: 0.4rem;">'
-            '🔒 Privacy Notice: Text fragments are securely processed in ephemeral memory and sent to Google Gemini for analysis. No permanent server storage.'
-            '</div>',
-            unsafe_allow_html=True
-        )
+        st.caption("🔒 Privacy Notice: Text fragments are securely processed in ephemeral memory and sent to Google Gemini for analysis. No permanent server storage.")
 
         if not configured_key:
             st.warning("🔑 **Gemini API Key Required:** Please add `GEMINI_API_KEY` to your Streamlit Secrets (or enter it in the left sidebar settings).")
@@ -454,8 +455,6 @@ if st.session_state.app_state == "analyzing" and st.session_state.extracted_doc:
             prompt = get_medical_lens_prompt(doc.full_text_with_sources, lang)
         else:
             prompt = get_study_lens_prompt(doc.full_text_with_sources, lang)
-
-        st.session_state.last_raw_prompt = prompt
 
         parsed_json, error = call_gemini_json_analysis(
             prompt=prompt,
@@ -531,7 +530,7 @@ if st.session_state.app_state == "service_error" and st.session_state.error_mess
     st.info("You can retry the analysis using the button in the document preview panel above.")
 
 # -----------------------------------------------------------------------------
-# Render Ready Dashboards
+# Render Ready Dashboards (Clean Native Containers)
 # -----------------------------------------------------------------------------
 if st.session_state.app_state == "ready" and st.session_state.analysis_data:
     data = st.session_state.analysis_data
@@ -546,77 +545,28 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
         subtype = st.session_state.active_subtype
         doc_title = data.get("document_title", st.session_state.extracted_doc.filename)
 
-        st.markdown(
-            f"""
-            <div class="dl-card dl-card-glow-emerald">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem;">
-                    <div>
-                        <div style="font-size: 0.78rem; text-transform: uppercase; color: #00E599; font-weight: 700; letter-spacing: 0.05em;">
-                            {subtype.upper()} • COVERAGE: {data.get('coverage_statement', 'Full document evaluated')}
-                        </div>
-                        <h2 style="margin: 0.2rem 0; font-size: 1.55rem; color: #FFFFFF; font-weight: 700;">
-                            {doc_title}
-                        </h2>
-                    </div>
-                    <div>
-                        {get_priority_badge(metrics.get('overall_priority', 'Low')) if subtype == DOC_SUBTYPE_CONTRACT else '<span class="badge-pill badge-clear">General Document Mode</span>'}
-                    </div>
-                </div>
-                <div class="{rtl_class}" style="color: #CBD5E1; font-size: 0.95rem; line-height: 1.7;">
-                    {data.get('summary', 'No summary generated.')}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        with st.container(border=True):
+            col_cov1, col_cov2 = st.columns([3, 1])
+            with col_cov1:
+                st.caption(f"{subtype.upper()} • COVERAGE: {data.get('coverage_statement', 'Full document evaluated')}")
+                st.subheader(f"📄 {doc_title}")
+            with col_cov2:
+                if subtype == DOC_SUBTYPE_CONTRACT:
+                    render_priority_badge(metrics.get('overall_priority', 'Low'))
+                else:
+                    st.success("General Document Mode")
+            st.write(data.get('summary', 'No summary generated.'))
 
         if subtype == DOC_SUBTYPE_CONTRACT:
             m1, m2, m3, m4 = st.columns(4)
             with m1:
-                p_text = metrics.get('overall_priority', 'Low')
-                st.markdown(
-                    f"""
-                    <div class="stat-box">
-                        <div class="stat-label">Review Priority</div>
-                        <div class="stat-value">{p_text}</div>
-                        <div style="font-size: 0.72rem; color: #94A3B8;">Rule-calculated</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                st.metric("Review Priority", metrics.get('overall_priority', 'Low'))
             with m2:
-                st.markdown(
-                    f"""
-                    <div class="stat-box">
-                        <div class="stat-label">Flagged Issues</div>
-                        <div class="stat-value">{metrics.get('unique_issues_count', 0)}</div>
-                        <div style="font-size: 0.72rem; color: #94A3B8;">Vague or unclear</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                st.metric("Flagged Issues", metrics.get('unique_issues_count', 0))
             with m3:
-                st.markdown(
-                    f"""
-                    <div class="stat-box">
-                        <div class="stat-label">Missing Topics</div>
-                        <div class="stat-value">{metrics.get('missing_topics_count', 0)}</div>
-                        <div style="font-size: 0.72rem; color: #94A3B8;">Absent checklist items</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                st.metric("Missing Topics", metrics.get('missing_topics_count', 0))
             with m4:
-                st.markdown(
-                    f"""
-                    <div class="stat-box">
-                        <div class="stat-label">Action Items</div>
-                        <div class="stat-value">{metrics.get('actions_count', 0)}</div>
-                        <div style="font-size: 0.72rem; color: #94A3B8;">Recommended steps</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                st.metric("Action Items", metrics.get('actions_count', 0))
 
             st.info(f"📌 **Review Priority Rule:** {metrics.get('priority_rule', '')}")
 
@@ -629,92 +579,63 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
         with tab_findings:
             if subtype == DOC_SUBTYPE_CONTRACT:
                 findings = data.get("contract_findings", [])
-                if not findings:
-                    st.success("All 6 standard contract checklist topics were evaluated.")
                 for f in findings:
-                    topic = f.get("checklist_topic", "General Topic")
-                    status = f.get("status", "Found")
-                    src_id = f.get("source_id", "Not found")
-                    quote = f.get("source_passage", "Not found in the analyzed text")
+                    topic = f.get("topic", "Topic")
+                    status = f.get("status", "Present")
+                    src_id = f.get("source_id", "Source")
+                    quote = f.get("source_passage", "")
                     expl = f.get("explanation", "")
                     clarify = f.get("clarification_question", "")
                     action = f.get("suggested_action", "")
                     prio = f.get("review_priority", "Low")
 
-                    glow_class = "dl-card-glow-rose" if prio == "High" else ("dl-card-glow-amber" if prio == "Medium" else "dl-card-glow-emerald")
+                    with st.container(border=True):
+                        fc1, fc2 = st.columns([3, 1])
+                        with fc1:
+                            st.markdown(f"### {topic}")
+                            st.caption(f"Status: **{status}** | Priority: **{prio}**")
+                        with fc2:
+                            st.caption(f"Source: `{src_id}`")
 
-                    st.markdown(
-                        f"""
-                        <div class="dl-card {glow_class}">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <div style="display: flex; align-items: center; gap: 0.6rem;">
-                                    <span style="font-size: 1.15rem; font-weight: 700; color: #FFFFFF;">{topic}</span>
-                                    {get_priority_badge(prio)}
-                                </div>
-                                <span class="badge-pill badge-source">{src_id}</span>
-                            </div>
-                            <div style="margin-bottom: 0.5rem; font-size: 0.85rem; color: #94A3B8;">
-                                Status: <strong style="color: #F1F5F9;">{status}</strong>
-                            </div>
-                            <div class="quote-callout">
-                                "{quote}"
-                            </div>
-                            <div class="{rtl_class}" style="color: #CBD5E1; font-size: 0.92rem; margin: 0.5rem 0;">
-                                {expl}
-                            </div>
-                            {f'<div style="background: rgba(0, 229, 153, 0.12); border-left: 3px solid #00E599; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #6EE7B7; margin-top: 0.5rem;"><strong>Suggested Question:</strong> {clarify}</div>' if clarify else ''}
-                            {f'<div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid #34D399; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #A7F3D0; margin-top: 0.4rem;"><strong>Recommended Action:</strong> {action}</div>' if action else ''}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                        st.info(f"\"{quote}\"")
+                        st.write(expl)
+                        if clarify:
+                            st.warning(f"**Suggested Question:** {clarify}")
+                        if action:
+                            st.success(f"**Recommended Action:** {action}")
             else:
                 gen_findings = data.get("general_findings", [])
                 for gf in gen_findings:
-                    st.markdown(
-                        f"""
-                        <div class="dl-card dl-card-glow-emerald">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1.1rem; font-weight: 700; color: #FFFFFF;">{gf.get('topic', 'Topic')}</span>
-                                <span class="badge-pill badge-source">{gf.get('source_id', 'Source')}</span>
-                            </div>
-                            <div class="{rtl_class}" style="color: #E2E8F0; font-size: 0.95rem; margin-bottom: 0.5rem;">
-                                {gf.get('key_fact', '')}
-                            </div>
-                            <div class="quote-callout">
-                                "{gf.get('source_passage', '')}"
-                            </div>
-                            {f'<div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid #34D399; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #A7F3D0; margin-top: 0.4rem;"><strong>Action:</strong> {gf.get("suggested_action")}</div>' if gf.get("suggested_action") else ''}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                    with st.container(border=True):
+                        g1, g2 = st.columns([3, 1])
+                        with g1:
+                            st.markdown(f"### {gf.get('topic', 'Topic')}")
+                        with g2:
+                            st.caption(f"Source: `{gf.get('source_id', 'Source')}`")
+                        st.write(gf.get('key_fact', ''))
+                        st.info(f"\"{gf.get('source_passage', '')}\"")
+                        if gf.get("suggested_action"):
+                            st.success(f"**Action:** {gf.get('suggested_action')}")
 
         with tab_details:
             kd = data.get("key_details", {})
             col_k1, col_k2 = st.columns(2)
             with col_k1:
-                render_html(f"""
-<div class="dl-card dl-card-glow-emerald">
-    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">👥 Parties & Entities</div>
-    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('parties', 'Not found')}</div>
-    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">📅 Dates & Effective Term</div>
-    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('effective_date', 'Not found')}</div>
-    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">💰 Amounts & Currency</div>
-    <div style="color: #F8FAFC; font-size: 0.92rem; line-height: 1.5;">{kd.get('amounts_and_currency', 'Not found')}</div>
-</div>
-""")
+                with st.container(border=True):
+                    st.markdown("#### 👥 Parties & Entities")
+                    st.write(kd.get('parties', 'Not found'))
+                    st.markdown("#### 📅 Dates & Effective Term")
+                    st.write(kd.get('effective_date', 'Not found'))
+                    st.markdown("#### 💰 Amounts & Currency")
+                    st.write(kd.get('amounts_and_currency', 'Not found'))
             with col_k2:
-                render_html(f"""
-<div class="dl-card dl-card-glow-emerald">
-    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">💳 Payment Terms</div>
-    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('payment_terms', 'Not found')}</div>
-    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">⏱️ Deadlines & Milestones</div>
-    <div style="color: #F8FAFC; font-size: 0.92rem; margin-bottom: 1.1rem; line-height: 1.5;">{kd.get('deadlines', 'Not found')}</div>
-    <div style="font-size: 1.05rem; font-weight: 700; color: #00E599; margin-bottom: 0.25rem;">📋 Core Responsibilities</div>
-    <div style="color: #F8FAFC; font-size: 0.92rem; line-height: 1.5;">{kd.get('responsibilities', 'Not found')}</div>
-</div>
-""")
+                with st.container(border=True):
+                    st.markdown("#### 💳 Payment Terms")
+                    st.write(kd.get('payment_terms', 'Not found'))
+                    st.markdown("#### ⏱️ Deadlines & Milestones")
+                    st.write(kd.get('deadlines', 'Not found'))
+                    st.markdown("#### 📋 Core Responsibilities")
+                    st.write(kd.get('responsibilities', 'Not found'))
 
         with tab_chat:
             st.markdown("##### 💬 Ask the Document")
@@ -751,73 +672,27 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
     # 2. MEDICAL LENS DASHBOARD
     # =========================================================================
     elif st.session_state.active_mode == MODE_MEDICAL_LENS:
-        st.markdown(
-            f"""
-            <div class="dl-card dl-card-glow-emerald">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem;">
-                    <div>
-                        <div style="font-size: 0.78rem; text-transform: uppercase; color: #2DD4BF; font-weight: 700; letter-spacing: 0.05em;">
-                            REPORT DATE: {data.get('report_date', 'Not stated')} • {data.get('coverage_statement', 'Report Evaluated')}
-                        </div>
-                        <h2 style="margin: 0.2rem 0; font-size: 1.55rem; color: #FFFFFF; font-weight: 700;">
-                            {data.get('report_title', 'Clinical Laboratory Report')}
-                        </h2>
-                        <div style="font-size: 0.8rem; color: #94A3B8;">
-                            Patient Context: {data.get('patient_context', 'De-identified')}
-                        </div>
-                    </div>
-                </div>
-                <div class="{rtl_class}" style="color: #CBD5E1; font-size: 0.95rem; line-height: 1.7; margin-top: 0.5rem;">
-                    {data.get('summary', 'No summary available.')}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        patient_info = data.get("patient_context", {})
+        with st.container(border=True):
+            mc1, mc2 = st.columns([3, 1])
+            with mc1:
+                st.caption(f"LAB REPORT • {data.get('lab_name', 'Clinical Laboratory')}")
+                st.subheader("🔬 Diagnostic Laboratory Overview")
+            with mc2:
+                st.caption(f"Date: {patient_info.get('report_date', 'Not stated')}")
+            st.write(data.get('overall_summary', 'No summary available.'))
 
         med1, med2, med3 = st.columns(3)
         with med1:
-            st.markdown(
-                f"""
-                <div class="stat-box">
-                    <div class="stat-label">Total Analytes</div>
-                    <div class="stat-value">{metrics.get('total_analytes', 0)}</div>
-                    <div style="font-size: 0.72rem; color: #94A3B8;">Tested parameters</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.metric("Total Analytes Evaluated", metrics.get('total_analytes', 0))
         with med2:
-            st.markdown(
-                f"""
-                <div class="stat-box">
-                    <div class="stat-label">Attention Count</div>
-                    <div class="stat-value" style="color: #F87171;">{metrics.get('attention_count', 0)}</div>
-                    <div style="font-size: 0.72rem; color: #94A3B8;">Outside supplied range</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.metric("Values Outside Range", metrics.get('attention_count', 0))
         with med3:
-            st.markdown(
-                f"""
-                <div class="stat-box">
-                    <div class="stat-label">Unassessed Values</div>
-                    <div class="stat-value" style="color: #2DD4BF;">{metrics.get('unassessed_count', 0)}</div>
-                    <div style="font-size: 0.72rem; color: #94A3B8;">Missing/qualitative range</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.metric("Unassessed Values", metrics.get('unassessed_count', 0))
 
-        st.markdown(
-            """
-            <div style="background: rgba(14, 20, 17, 0.85); border: 1px solid rgba(0, 229, 153, 0.2); border-radius: 10px; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.8rem; color: #94A3B8; line-height: 1.5;">
-                ℹ️ <strong>Clinical Safety Standard:</strong> 'No abnormal values identified' means only that no validated numeric result was outside its supplied interval.
-                It must never be presented as a declaration that the user is healthy. This application is an educational AI Report Assistant and does not provide clinical diagnoses.
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.info(
+            "ℹ️ **Clinical Safety Standard:** 'No abnormal values identified' means only that no validated numeric result was outside its supplied interval. "
+            "It must never be presented as a declaration that the patient is healthy. This application is an educational AI Report Assistant and does not provide clinical diagnoses."
         )
 
         med_tab_results, med_tab_questions, med_tab_chat = st.tabs([
@@ -828,61 +703,42 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         with med_tab_results:
             results = data.get("test_results", [])
-            for res in results:
-                t_name = res.get("test_name", "Analyte")
-                val = res.get("raw_result", "N/A")
-                unit = res.get("unit", "")
-                interval = res.get("raw_interval", "Not stated")
-                comp = res.get("computed_comparison", "Cannot assess from the supplied range")
-                flag = res.get("reported_flag", "None")
-                src = res.get("source_id", "N/A")
-                expl = res.get("general_explanation", "")
-                doctor_q = res.get("doctor_question", "")
-                has_conflict = res.get("has_conflict", False)
-                conflict_note = res.get("flag_conflict_note")
+            for r in results:
+                t_name = r.get("test_name", "Test Analyte")
+                raw_val = r.get("raw_result", "")
+                unit = r.get("unit", "")
+                raw_int = r.get("raw_interval", "")
+                rep_flag = r.get("reported_flag", "None")
+                src_id = r.get("source_id", "Source")
+                quote = r.get("source_passage", "")
+                comp = r.get("computed_comparison", "Cannot assess from range")
+                expl = r.get("general_explanation", "")
+                doctor_q = r.get("doctor_question", "")
+                conflict = r.get("has_conflict", False)
+                conflict_note = r.get("flag_conflict_note")
 
-                glow = "dl-card-glow-rose" if "Above" in comp or "Below" in comp or has_conflict else ("dl-card-glow-emerald" if "Within" in comp else "dl-card-glow-indigo")
+                with st.container(border=True):
+                    rc1, rc2 = st.columns([3, 1])
+                    with rc1:
+                        st.markdown(f"### {t_name}")
+                        st.caption(f"Result: **{raw_val} {unit}** | Normal Range: **{raw_int}** | Lab Flag: **{rep_flag}**")
+                    with rc2:
+                        st.caption(f"Source: `{src_id}`")
 
-                st.markdown(
-                    f"""
-                    <div class="dl-card {glow}">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span style="font-size: 1.15rem; font-weight: 700; color: #FFFFFF;">{t_name}</span>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                {get_medical_comparison_badge(comp, has_conflict)}
-                                <span class="badge-pill badge-source">{src}</span>
-                            </div>
-                        </div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 0.6rem 0; font-size: 0.88rem; color: #CBD5E1;">
-                            <div><strong>Observed Value:</strong> <span style="font-size: 1.05rem; font-weight: 700; color: #FFFFFF;">{val}</span> {unit}</div>
-                            <div><strong>Supplied Range:</strong> {interval}</div>
-                            <div><strong>Reported by Laboratory:</strong> <span class="badge-pill badge-source">{flag}</span></div>
-                        </div>
-                        {f'<div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.5rem 0.8rem; font-size: 0.82rem; color: #FCA5A5; margin-bottom: 0.5rem;">⚠️ {conflict_note}</div>' if conflict_note else ''}
-                        <div class="{rtl_class}" style="margin: 0.6rem 0; font-size: 0.88rem; color: #94A3B8; line-height: 1.6;">
-                            <span style="font-size: 0.76rem; text-transform: uppercase; font-weight: 700; color: #38BDF8;">[General explanation]</span> {expl}
-                        </div>
-                        <div style="background: rgba(20, 184, 166, 0.1); border-left: 3px solid #14B8A6; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #5EEAD4; margin-top: 0.5rem;">
-                            <strong>Question for your Doctor:</strong> {doctor_q}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                    render_medical_comparison_badge(comp, conflict)
+                    if conflict:
+                        st.error(f"⚡ Conflict: {conflict_note}")
+
+                    st.info(f"\"{quote}\"")
+                    st.write(f"**Educational Description:** {expl}")
+                    st.warning(f"**Question for Doctor:** {doctor_q}")
 
         with med_tab_questions:
-            st.markdown("##### 🩺 Doctor Discussion Checklist")
-            st.caption("Actionable questions tailored from your laboratory report to ask your clinician during your next visit.")
             checklist = data.get("doctor_discussion_checklist", [])
+            st.markdown("##### 🩺 Doctor Discussion Checklist")
             for idx, q in enumerate(checklist, 1):
-                st.markdown(
-                    f"""
-                    <div style="background: rgba(30, 41, 59, 0.5); border-left: 4px solid #14B8A6; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 0.6rem; color: #F1F5F9; font-size: 0.92rem;">
-                        <strong>{idx}.</strong> {q}
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                with st.container(border=True):
+                    st.markdown(f"**{idx}.** {q}")
 
         with med_tab_chat:
             st.markdown("##### 💬 Medical Report Assistant Chat")
@@ -919,29 +775,12 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
     # 3. STUDY LENS DASHBOARD
     # =========================================================================
     elif st.session_state.active_mode == MODE_STUDY_LENS:
-        st.markdown(
-            f"""
-            <div class="dl-card dl-card-glow-amber">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem;">
-                    <div>
-                        <div style="font-size: 0.78rem; text-transform: uppercase; color: #FBBF24; font-weight: 700; letter-spacing: 0.05em;">
-                            {data.get('course_or_subject', 'Study Material')} • COVERAGE: {data.get('coverage_statement', 'Module Analyzed')}
-                        </div>
-                        <h2 style="margin: 0.2rem 0; font-size: 1.55rem; color: #FFFFFF; font-weight: 700;">
-                            Learning Overview & Concept Synthesis
-                        </h2>
-                    </div>
-                </div>
-                <div class="{rtl_class}" style="color: #CBD5E1; font-size: 0.95rem; line-height: 1.7;">
-                    {data.get('summary', 'No summary available.')}
-                </div>
-                <div class="{rtl_class}" style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.08); color: #E2E8F0; font-size: 0.92rem; line-height: 1.6;">
-                    <strong>Topic Interplay:</strong> {data.get('topic_overview', '')}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        with st.container(border=True):
+            st.caption(f"{data.get('course_or_subject', 'Study Material')} • COVERAGE: {data.get('coverage_statement', 'Module Analyzed')}")
+            st.subheader("📚 Learning Overview & Concept Synthesis")
+            st.write(data.get('summary', 'No summary available.'))
+            if data.get('topic_overview'):
+                st.info(f"**Topic Interplay:** {data.get('topic_overview')}")
 
         study_tab_notes, study_tab_quiz, study_tab_chat = st.tabs([
             "📚 Revision Notes & Concepts",
@@ -959,27 +798,17 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                 quote = n.get("source_passage", "")
                 ex = n.get("assistant_example")
 
-                st.markdown(
-                    f"""
-                    <div class="dl-card dl-card-glow-emerald">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span class="badge-pill badge-source">{cat.upper()}</span>
-                                <span style="font-size: 1.1rem; font-weight: 700; color: #FFFFFF;">{title}</span>
-                            </div>
-                            <span class="badge-pill badge-source">{src}</span>
-                        </div>
-                        <div class="{rtl_class}" style="color: #E2E8F0; font-size: 0.94rem; line-height: 1.7; margin: 0.5rem 0;">
-                            {content}
-                        </div>
-                        <div class="quote-callout">
-                            "{quote}"
-                        </div>
-                        {f'<div style="background: rgba(245, 158, 11, 0.1); border-left: 3px solid #F59E0B; padding: 0.5rem 0.8rem; border-radius: 4px; font-size: 0.86rem; color: #FCD34D; margin-top: 0.4rem;"><strong>[Assistant Example]:</strong> {ex}</div>' if ex else ''}
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                with st.container(border=True):
+                    sc1, sc2 = st.columns([3, 1])
+                    with sc1:
+                        st.markdown(f"### 📖 [{cat.upper()}] {title}")
+                    with sc2:
+                        st.caption(f"Source: `{src}`")
+
+                    st.write(content)
+                    st.info(f"\"{quote}\"")
+                    if ex:
+                        st.success(f"**Assistant Example:** {ex}")
 
         with study_tab_quiz:
             quiz_list = data.get("quiz", [])
@@ -988,32 +817,27 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
             with st.form("study_quiz_form"):
                 current_choices = {}
-                for idx, q in enumerate(quiz_list):
-                    q_id = q.get("question_id", idx + 1)
+                for q in quiz_list:
+                    q_id = q.get("question_id", 1)
                     q_stem = q.get("question", "")
                     options = q.get("options", [])
+
                     st.markdown(f"**Q{q_id}. {q_stem}**")
-
-                    existing_val = st.session_state.quiz_user_answers.get(q_id, None)
-
-                    selected = st.radio(
-                        f"Choice for Q{q_id}",
-                        options=list(range(len(options))),
-                        format_func=lambda i: f"[{chr(65+i)}] {options[i]}",
-                        key=f"quiz_radio_{q_id}",
-                        index=existing_val if existing_val is not None else 0,
+                    choice = st.radio(
+                        f"Select your answer for Q{q_id}:",
+                        options=range(len(options)),
+                        format_func=lambda i, opts=options: f"[{chr(65+i)}] {opts[i]}",
+                        key=f"quiz_q_{q_id}",
                         label_visibility="collapsed"
                     )
-                    current_choices[q_id] = selected
-                    st.markdown("---")
+                    current_choices[q_id] = choice
+                    st.divider()
 
-                col_sub, col_retake = st.columns([1, 1])
-                with col_sub:
-                    submitted = st.form_submit_button("✅ Submit Answers", use_container_width=True)
+                submit_quiz = st.form_submit_button("Submit Quiz for Evaluation", type="primary")
 
-            if submitted:
-                st.session_state.quiz_submitted = True
+            if submit_quiz:
                 st.session_state.quiz_user_answers = current_choices
+                st.session_state.quiz_submitted = True
                 st.session_state.quiz_results = calculate_quiz_score(quiz_list, current_choices)
                 st.rerun()
 
@@ -1023,22 +847,17 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                 tot = res.get("total", 5)
                 pct = res.get("percentage", 0.0)
 
-                st.markdown(
-                    f"""
-                    <div class="dl-card dl-card-glow-emerald" style="margin-top: 1.5rem; text-align: center;">
-                        <h3 style="margin: 0; color: #FFFFFF;">Quiz Results</h3>
-                        <div style="font-size: 2.5rem; font-weight: 800; color: #34D399; margin: 0.5rem 0;">
-                            {score} / {tot} ({pct}%)
-                        </div>
-                        <div style="font-size: 0.9rem; color: #CBD5E1;">
-                            {'🎉 Excellent mastery of the study material!' if pct >= 80 else ('👍 Good effort! Review the detailed answer keys below to strengthen weak areas.' if pct >= 60 else '⚠️ Review the revision notes and cited passages to reinforce key concepts.')}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                with st.container(border=True):
+                    st.subheader("Quiz Results")
+                    st.metric("Final Score", f"{score} / {tot}", f"{pct}%")
+                    if pct >= 80:
+                        st.success("🌟 Excellent mastery of the study material!")
+                    elif pct >= 60:
+                        st.info("👍 Good effort! Review the detailed answer keys below to strengthen weak areas.")
+                    else:
+                        st.warning("📖 Review the revision notes and cited passages to reinforce key concepts.")
 
-                st.markdown("#### 🔍 Answer Breakdown & Citations")
+                st.markdown("#### 🎯 Answer Breakdown & Citations")
                 for item in res.get("details", []):
                     q_num = item["question_id"]
                     is_corr = item["is_correct"]
@@ -1049,33 +868,16 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                     src = item["source_id"]
                     passage = item["source_passage"]
 
-                    badge_class = "badge-clear" if is_corr else "badge-high"
-                    status_label = "✅ Correct" if is_corr else "❌ Incorrect"
+                    with st.container(border=True):
+                        st.markdown(f"**Q{q_num}: {item['question']}**")
+                        if is_corr:
+                            st.success(f"Your Answer: [{chr(65+u_pick)}] {opts[u_pick]} (Correct)")
+                        else:
+                            st.error(f"Your Answer: [{chr(65+u_pick)}] {opts[u_pick]} (Incorrect)")
+                            st.success(f"Correct Answer: [{chr(65+c_pick)}] {opts[c_pick]}")
 
-                    st.markdown(
-                        f"""
-                        <div class="dl-card" style="border-left: 4px solid {'#10B981' if is_corr else '#EF4444'};">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1rem; font-weight: 700; color: #FFFFFF;">Q{q_num}: {item['question']}</span>
-                                <div style="display: flex; gap: 0.4rem;">
-                                    <span class="badge-pill {badge_class}">{status_label}</span>
-                                    <span class="badge-pill badge-source">{src}</span>
-                                </div>
-                            </div>
-                            <div style="font-size: 0.88rem; margin: 0.4rem 0;">
-                                Your Answer: <strong style="color: {'#34D399' if is_corr else '#F87171'};">[{chr(65+u_pick)}] {opts[u_pick]}</strong>
-                                {f'<br>Correct Answer: <strong style="color: #34D399;">[{chr(65+c_pick)}] {opts[c_pick]}</strong>' if not is_corr else ''}
-                            </div>
-                            <div style="background: rgba(15, 23, 42, 0.7); border-radius: 6px; padding: 0.6rem 0.8rem; font-size: 0.86rem; color: #CBD5E1; margin-top: 0.4rem;">
-                                <strong>Explanation:</strong> {expl}
-                            </div>
-                            <div class="quote-callout">
-                                "{passage}"
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                        st.write(f"**Explanation:** {expl}")
+                        st.info(f"Source ({src}): \"{passage}\"")
 
         with study_tab_chat:
             st.markdown("##### 💬 Ask the Study Notes")
@@ -1112,38 +914,18 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 # Empty State Landing (When no file uploaded or analyzed yet)
 # -----------------------------------------------------------------------------
 elif st.session_state.app_state in ["empty", "ready_for_analysis"] and not st.session_state.analysis_data:
-    st.markdown(
-        """
-        <div class="dl-card" style="margin-top: 1rem; padding: 2.2rem; text-align: center;">
-            <div style="font-size: 3rem; margin-bottom: 0.8rem;">📑</div>
-            <h2 style="margin: 0; font-size: 1.8rem; font-weight: 800; color: #FFFFFF;">
-                Welcome to DocuLens AI
-            </h2>
-            <p style="color: #94A3B8; font-size: 1rem; max-width: 650px; margin: 0.8rem auto 1.5rem auto; line-height: 1.6;">
-                Upload a contract, clinical report, or lecture module above — or choose a pre-loaded demo document in the sidebar to explore grounded document intelligence.
-            </p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; text-align: left; margin-top: 1rem;">
-                <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 1.2rem;">
-                    <div style="font-size: 1.2rem; margin-bottom: 0.3rem;">📄 <strong>Document Lens</strong></div>
-                    <div style="font-size: 0.84rem; color: #94A3B8; line-height: 1.5;">
-                        Examines contracts & general agreements against a 6-topic checklist. Flags vague clauses and missing terms with deterministic review priorities.
-                    </div>
-                </div>
-                <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 1.2rem;">
-                    <div style="font-size: 1.2rem; margin-bottom: 0.3rem;">🩺 <strong>Medical Lens</strong></div>
-                    <div style="font-size: 0.84rem; color: #94A3B8; line-height: 1.5;">
-                        Explains laboratory reports with boundary-tested interval comparisons, detects lab flag conflicts, and prepares doctor discussion checklists.
-                    </div>
-                </div>
-                <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 1.2rem;">
-                    <div style="font-size: 1.2rem; margin-bottom: 0.3rem;">🎓 <strong>Study Lens</strong></div>
-                    <div style="font-size: 0.84rem; color: #94A3B8; line-height: 1.5;">
-                        Structures definitions, key formulas, and study steps from notes. Generates an interactive 5-question practice quiz with hidden answers and scoring.
-                    </div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+    st.subheader("📑 Welcome to DocuLens AI", anchor=False)
+    st.caption("Upload any contract, clinical report, lecture notes, textbook, or photo above — or pick a demo fixture in the sidebar.")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        with st.container(border=True):
+            st.markdown("### 📄 Document Lens")
+            st.write("Contract audit against 6-topic checklist. Detects vague wording, missing provisions, and deterministic review priorities.")
+    with c2:
+        with st.container(border=True):
+            st.markdown("### 🩺 Medical Lens")
+            st.write("Clinical analyte extraction, numeric reference range comparisons, conflict detection, and clinician discussion questions.")
+    with c3:
+        with st.container(border=True):
+            st.markdown("### 🎓 Study Lens")
+            st.write("Revision notes, key formula synthesis, and interactive 5-question multiple choice quizzes with instant scoring.")

@@ -275,6 +275,67 @@ def render_medical_avatar_banner():
     """Renders the static AI Report Assistant avatar banner compliant with PRD Section 4."""
     return f"""<div class="avatar-header"><div style="flex-shrink:0;">{STATIC_AI_ASSISTANT_AVATAR_SVG}</div><div style="flex-grow:1;"><div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.2rem;"><span style="font-size:1.15rem;font-weight:700;color:#FFFFFF;">AI Report Assistant</span><span class="avatar-badge-tag">AI Powered • Non-Diagnostic</span></div><p style="margin:0;font-size:0.82rem;color:#94A3B8;line-height:1.4;">Objective laboratory observations and educational test explanations. Does not diagnose health conditions, prescribe therapy, or replace consultation with a qualified clinical physician.</p></div></div>"""
 
+def render_priority_badge(priority: str):
+    """Renders a native Streamlit badge for review priority without any raw HTML leakage."""
+    import streamlit as st
+    p_clean = priority.strip().lower()
+    if p_clean == "high":
+        if hasattr(st, "badge"):
+            st.badge("High Priority", icon="⚠️", color="red")
+        else:
+            st.error("⚠️ High Priority")
+    elif p_clean == "medium":
+        if hasattr(st, "badge"):
+            st.badge("Medium Priority", icon="⚖️", color="orange")
+        else:
+            st.warning("⚖️ Medium Priority")
+    elif p_clean == "low":
+        if hasattr(st, "badge"):
+            st.badge("Low Priority", icon="ℹ️", color="blue")
+        else:
+            st.info("ℹ️ Low Priority")
+    elif "no flagged" in p_clean:
+        if hasattr(st, "badge"):
+            st.badge("No Flagged Issues", icon="✅", color="green")
+        else:
+            st.success("✅ No Flagged Issues")
+    else:
+        if hasattr(st, "badge"):
+            st.badge(priority, icon="ℹ️", color="blue")
+        else:
+            st.info(priority)
+
+def render_medical_comparison_badge(comparison: str, has_conflict: bool = False):
+    """Renders a native Streamlit badge for medical range evaluations without any raw HTML leakage."""
+    import streamlit as st
+    comp_clean = comparison.strip().lower()
+    if has_conflict:
+        if hasattr(st, "badge"):
+            st.badge(f"{comparison} (Conflict)", icon="⚡", color="red")
+        else:
+            st.error(f"⚡ {comparison} (Conflict)")
+        return
+    if "above" in comp_clean:
+        if hasattr(st, "badge"):
+            st.badge("Above range", icon="🔺", color="red")
+        else:
+            st.error("🔺 Above range")
+    elif "below" in comp_clean:
+        if hasattr(st, "badge"):
+            st.badge("Below range", icon="🔻", color="orange")
+        else:
+            st.warning("🔻 Below range")
+    elif "within" in comp_clean:
+        if hasattr(st, "badge"):
+            st.badge("Within range", icon="✅", color="green")
+        else:
+            st.success("✅ Within range")
+    else:
+        if hasattr(st, "badge"):
+            st.badge("Cannot assess from range", icon="❓", color="gray")
+        else:
+            st.caption("❓ Cannot assess from range")
+
 def get_priority_badge(priority: str) -> str:
     """Returns an HTML badge pill for review priority."""
     p_clean = priority.strip().lower()

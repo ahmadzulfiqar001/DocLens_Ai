@@ -4,8 +4,8 @@ from typing import List, Dict
 
 # Application Metadata
 APP_NAME = "DocuLens AI"
-APP_TAGLINE = "Intelligent Multi-Lens Document Analysis & Grounded Evidence Engine"
-APP_VERSION = "1.0.0"
+APP_TAGLINE = "Grounded Document Intelligence & Multi-Lens Knowledge Engine"
+APP_VERSION = "2.0.0"
 
 # Supported Modes
 MODE_DOC_LENS = "Document Lens"
@@ -24,11 +24,12 @@ LANG_ROMAN_URDU = "Roman Urdu"
 LANG_URDU = "Urdu (اردو)"
 ALL_LANGUAGES = [LANG_ENGLISH, LANG_ROMAN_URDU, LANG_URDU]
 
-# System Limits (PRD C01, C02)
-MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
-MAX_PDF_PAGES = 15
-MAX_EXTRACTED_CHARS = 25000
-SUPPORTED_EXTENSIONS = ["pdf", "docx", "txt"]
+# System Limits - Expanded per user request (Removed 15 page limit, added images, Word, PDF)
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+MAX_PDF_PAGES = 500  # Virtually unlimited
+MAX_EXTRACTED_CHARS = 250000  # 250k characters
+SUPPORTED_EXTENSIONS = ["pdf", "docx", "doc", "txt", "md", "jpeg", "jpg", "png", "webp"]
+IMAGE_EXTENSIONS = ["jpeg", "jpg", "png", "webp"]
 
 # Contract Review Topics (PRD D02, D04)
 CONTRACT_CHECKLIST_TOPICS = [
@@ -55,4 +56,3 @@ AVAILABLE_GEMINI_MODELS = [
 # Static Avatar URL / SVG configuration (Medical Lens static AI avatar)
 ASSISTANT_AVATAR_ICON = "🤖"
 DOCTOR_AVATAR_ICON = "🩺"
-

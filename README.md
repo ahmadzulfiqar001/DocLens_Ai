@@ -16,8 +16,9 @@ DocuLens AI is a modern document intelligence web application powered by **Googl
 
 ## 🌟 Key Features
 
-* **Google Gen AI Integration**: Powered by the official Google Gen AI Python SDK (`google-genai`) with models like `gemini-2.5-flash` and `gemini-2.5-pro`.
-* **Multi-Format Extraction**: Ingests PDF, DOCX, and TXT files up to 10 MB, preserving exact source locations (`[Page X]` or `[Para Y]`).
+* **Google Gen AI Integration**: Powered by the official Google Gen AI Python SDK (`google-genai`) with models like `gemini-flash-latest`, `gemini-flash-lite-latest`, and automatic high-demand fallback.
+* **Universal Multi-Format Upload**: Ingests PDF (up to 500 pages with PyMuPDF OCR for scanned pages), Word (`.docx`, `.doc`), Plain Text (`.txt`, `.md`), and Document Images (`.jpeg`, `.jpg`, `.png`, `.webp`) up to 50 MB, preserving exact source locations (`[Page X]`, `[Para Y]`, or `[Section Z]`).
+* **100% Clean Native UI**: Built with native Streamlit containers, badges, and metrics with a high-contrast Cyber Emerald & Obsidian Noir aesthetic — completely eliminating raw HTML leakage.
 * **Deterministic Computations**: Model supplies textual explanations, while application code deterministically computes review priorities, medical range comparisons, and quiz scores.
 * **Grounded Document Chat**: Q&A strictly backed by active document citations. Medical requests for diagnosis or medication trigger explicit boundary statements with clinician-directed questions.
 * **Multilingual Output**: Seamless generation in **Simple English**, **Roman Urdu**, and **Urdu (اردو)** with authentic Right-to-Left (RTL) typography.
@@ -49,9 +50,9 @@ DocLens_Ai/
 │   └── 06_study_notes_compiler.txt     # Tests compiler lecture notes, formulas & 5-MCQ quiz
 ├── src/
 │   ├── __init__.py                     # Package marker
-│   ├── config.py                       # Constants, limits (10MB, 15 pages, 25k chars), Gemini models
+│   ├── config.py                       # Constants, limits (50MB, 500 pages, 250k chars), Gemini models
 │   ├── deterministic_rules.py          # Deterministic priority rules, range logic, quiz scoring
-│   ├── extractors.py                   # PDF (PyMuPDF), DOCX, TXT extractors with source anchors
+│   ├── extractors.py                   # PDF (PyMuPDF + OCR), Word, TXT, MD, Images (Gemini Vision)
 │   ├── export.py                       # UTF-8 formatted text analysis report generator
 │   ├── gemini_client.py                # Official Google Gen AI client with 1-attempt repair & SDK calls
 │   ├── prompts.py                      # Injection-hardened system prompts & RTL multilingual rules
