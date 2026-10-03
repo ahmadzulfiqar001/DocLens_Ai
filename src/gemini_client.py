@@ -134,8 +134,9 @@ def call_gemini_json_analysis(
 
         except APIError as apie:
             err_str = str(apie)
-            if ("503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower()) and net_attempt < max_network_retries - 1:
-                time.sleep(2.0 * (net_attempt + 1))
+            if ("503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower() or "404" in err_str) and net_attempt < max_network_retries - 1:
+                model = "gemini-flash-lite-latest"
+                time.sleep(1.0 * (net_attempt + 1))
                 continue
             return None, f"Gemini API Error: {err_str}"
 
@@ -228,8 +229,9 @@ GROUNDING AND CITATION RULES:
 
         except APIError as apie:
             err_str = str(apie)
-            if ("503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower()) and net_attempt < 2:
-                time.sleep(2.0 * (net_attempt + 1))
+            if ("503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower() or "404" in err_str) and net_attempt < 2:
+                model = "gemini-flash-lite-latest"
+                time.sleep(1.0 * (net_attempt + 1))
                 continue
             return None, f"Gemini API Error: {err_str}"
         except Exception as e:

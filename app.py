@@ -335,45 +335,24 @@ if st.session_state.active_mode == MODE_MEDICAL_LENS:
 file_bytes_to_process = None
 filename_to_process = None
 
-# Check if a fixture was selected from dropdown
-if chosen_fixture_name != "None (Use File Uploader)" and fixture_files.get(chosen_fixture_name):
+# Primary File Uploader (Always available)
+uploaded_file = st.file_uploader(
+    "Upload a document (PDF, DOCX, or TXT — Max 10 MB, 15 PDF pages)",
+    type=["pdf", "docx", "txt"],
+    key="main_file_uploader",
+    help="Upload text-based lecture notes, agreements, or medical reports."
+)
+
+if uploaded_file is not None:
+    file_bytes_to_process = uploaded_file.getvalue()
+    filename_to_process = uploaded_file.name
+elif chosen_fixture_name != "None (Use File Uploader)" and fixture_files.get(chosen_fixture_name):
     rel_path = fixture_files[chosen_fixture_name]
     abs_path = os.path.join(os.path.dirname(__file__), rel_path)
     if os.path.exists(abs_path):
         with open(abs_path, "rb") as f:
             file_bytes_to_process = f.read()
         filename_to_process = os.path.basename(abs_path)
-        
-        # Auto-align mode with fixture if appropriate for best demo UX
-        if "incomplete_contract" in filename_to_process or "complete_contract" in filename_to_process:
-            if st.session_state.active_mode != MODE_DOC_LENS:
-                st.session_state.active_mode = MODE_DOC_LENS
-                st.session_state.active_subtype = DOC_SUBTYPE_CONTRACT
-                st.rerun()
-        elif "general_document" in filename_to_process:
-            if st.session_state.active_mode != MODE_DOC_LENS or st.session_state.active_subtype != DOC_SUBTYPE_GENERAL:
-                st.session_state.active_mode = MODE_DOC_LENS
-                st.session_state.active_subtype = DOC_SUBTYPE_GENERAL
-                st.rerun()
-        elif "medical_report" in filename_to_process:
-            if st.session_state.active_mode != MODE_MEDICAL_LENS:
-                st.session_state.active_mode = MODE_MEDICAL_LENS
-                st.rerun()
-        elif "study_notes" in filename_to_process:
-            if st.session_state.active_mode != MODE_STUDY_LENS:
-                st.session_state.active_mode = MODE_STUDY_LENS
-                st.rerun()
-
-# File Uploader
-if not file_bytes_to_process:
-    uploaded_file = st.file_uploader(
-        "Upload a document (PDF, DOCX, or TXT — Max 10 MB, 15 PDF pages)",
-        type=["pdf", "docx", "txt"],
-        help="Upload text-based agreements, medical test reports, or study materials."
-    )
-    if uploaded_file:
-        file_bytes_to_process = uploaded_file.read()
-        filename_to_process = uploaded_file.name
 
 # -----------------------------------------------------------------------------
 # Extraction & Pre-Analysis Validation (PRD C01, C02)
