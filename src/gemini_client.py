@@ -90,48 +90,54 @@ def call_gemini_json_analysis(
     )
 
     raw_text = ""
-    for attempt in range(2):
+    # Support retrying transient 503 high-demand errors
+    max_network_retries = 3
+    for net_attempt in range(max_network_retries):
         try:
-            if attempt == 0:
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=config
-                )
-            else:
-                repair_prompt = (
-                    f"The previous output caused a JSON parsing error.\n\n"
-                    f"Previous Output:\n{raw_text}\n\n"
-                    f"Please reformat and return ONLY strictly valid JSON. No markdown backticks."
-                )
-                response = client.models.generate_content(
-                    model=model,
-                    contents=repair_prompt,
-                    config=config
-                )
+            for attempt in range(2):
+                if attempt == 0:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=prompt,
+                        config=config
+                    )
+                else:
+                    repair_prompt = (
+                        f"The previous output caused a JSON parsing error.\n\n"
+                        f"Previous Output:\n{raw_text}\n\n"
+                        f"Please reformat and return ONLY strictly valid JSON. No markdown backticks."
+                    )
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=repair_prompt,
+                        config=config
+                    )
 
-            raw_text = response.text or ""
-            # Clean possible markdown wrapping if returned
-            clean_text = raw_text.strip()
-            if clean_text.startswith("```json"):
-                clean_text = clean_text[7:]
-            if clean_text.startswith("```"):
-                clean_text = clean_text[3:]
-            if clean_text.endswith("```"):
-                clean_text = clean_text[:-3]
-            clean_text = clean_text.strip()
+                raw_text = response.text or ""
+                clean_text = raw_text.strip()
+                if clean_text.startswith("```json"):
+                    clean_text = clean_text[7:]
+                if clean_text.startswith("```"):
+                    clean_text = clean_text[3:]
+                if clean_text.endswith("```"):
+                    clean_text = clean_text[:-3]
+                clean_text = clean_text.strip()
 
-            parsed = json.loads(clean_text)
-            return parsed, None
-
-        except json.JSONDecodeError as jde:
-            if attempt == 0:
-                time.sleep(0.5)
-                continue
-            return None, f"Failed to parse structured JSON from Gemini after 1 repair attempt: {str(jde)}"
+                try:
+                    parsed = json.loads(clean_text)
+                    return parsed, None
+                except json.JSONDecodeError as jde:
+                    if attempt == 0:
+                        time.sleep(0.5)
+                        continue
+                    return None, f"Failed to parse structured JSON from Gemini after 1 repair attempt: {str(jde)}"
 
         except APIError as apie:
-            return None, f"Gemini API Error: {str(apie)}"
+            err_str = str(apie)
+            if ("503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower()) and net_attempt < max_network_retries - 1:
+                time.sleep(2.0 * (net_attempt + 1))
+                continue
+            return None, f"Gemini API Error: {err_str}"
 
         except Exception as e:
             return None, f"Unexpected error during Gemini analysis: {str(e)}"
@@ -210,16 +216,23 @@ GROUNDING AND CITATION RULES:
         max_output_tokens=2048
     )
 
-    try:
-        response = client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=config
-        )
-        answer = response.text or ""
-        return answer, None
+    for net_attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config
+            )
+            answer = response.text or ""
+            return answer, None
 
-    except APIError as apie:
-        return None, f"Gemini API Error: {str(apie)}"
-    except Exception as e:
-        return None, f"Unexpected chat error: {str(e)}"
+        except APIError as apie:
+            err_str = str(apie)
+            if ("503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower()) and net_attempt < 2:
+                time.sleep(2.0 * (net_attempt + 1))
+                continue
+            return None, f"Gemini API Error: {err_str}"
+        except Exception as e:
+            return None, f"Unexpected chat error: {str(e)}"
+
+    return None, "Chat request timed out or unavailable."

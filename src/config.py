@@ -46,11 +46,11 @@ HIGH_PRIORITY_TOPICS = ["Payment Terms", "Termination", "Dispute Resolution"]
 MEDIUM_PRIORITY_TOPICS = ["Obligations", "Duration or Renewal", "Governing Law"]
 
 # Google Gemini Model Defaults (Verified active production models)
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
 AVAILABLE_GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-1.5-flash"
+    "gemini-flash-latest",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite"
 ]
 
 # Static Avatar URL / SVG configuration (Medical Lens static AI avatar)
