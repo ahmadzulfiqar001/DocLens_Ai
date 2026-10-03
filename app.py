@@ -479,20 +479,29 @@ if st.session_state.app_state == "analyzing" and st.session_state.extracted_doc:
             if mode == MODE_DOC_LENS:
                 if st.session_state.active_subtype == DOC_SUBTYPE_CONTRACT:
                     findings = parsed_json.get("contract_findings", [])
+                    if not isinstance(findings, list):
+                        findings = []
                     st.session_state.deterministic_metrics = compute_contract_metrics(findings, is_complete=True)
                 else:
+                    g_findings = parsed_json.get("general_findings", [])
+                    if not isinstance(g_findings, list):
+                        g_findings = []
                     st.session_state.deterministic_metrics = {
-                        "general_findings_count": len(parsed_json.get("general_findings", [])),
-                        "actions_count": len([f for f in parsed_json.get("general_findings", []) if f.get("suggested_action")])
+                        "general_findings_count": len(g_findings),
+                        "actions_count": len([f for f in g_findings if isinstance(f, dict) and f.get("suggested_action")])
                     }
 
             elif mode == MODE_MEDICAL_LENS:
                 results = parsed_json.get("test_results", [])
+                if not isinstance(results, list):
+                    results = []
                 attention_count = 0
                 unassessed_count = 0
                 augmented_results = []
 
                 for r in results:
+                    if not isinstance(r, dict):
+                        continue
                     raw_val = r.get("raw_result", "")
                     raw_int = r.get("raw_interval", "")
                     rep_flag = r.get("reported_flag", "None")
@@ -520,12 +529,17 @@ if st.session_state.app_state == "analyzing" and st.session_state.extracted_doc:
 
             elif mode == MODE_STUDY_LENS:
                 quiz_items = parsed_json.get("quiz", [])
+                if not isinstance(quiz_items, list):
+                    quiz_items = []
+                rev_notes = parsed_json.get("revision_notes", [])
+                if not isinstance(rev_notes, list):
+                    rev_notes = []
                 st.session_state.quiz_user_answers = {}
                 st.session_state.quiz_submitted = False
                 st.session_state.quiz_results = {}
                 st.session_state.deterministic_metrics = {
                     "total_quiz_questions": len(quiz_items),
-                    "revision_notes_count": len(parsed_json.get("revision_notes", []))
+                    "revision_notes_count": len(rev_notes)
                 }
 
             st.rerun()
@@ -624,6 +638,8 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         with tab_details:
             kd = data.get("key_details", {})
+            if not isinstance(kd, dict):
+                kd = {}
             col_k1, col_k2 = st.columns(2)
             with col_k1:
                 with st.container(border=True):
@@ -677,15 +693,27 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
     # 2. MEDICAL LENS DASHBOARD
     # =========================================================================
     elif st.session_state.active_mode == MODE_MEDICAL_LENS:
-        patient_info = data.get("patient_context", {})
+        patient_raw = data.get("patient_context", "")
+        if isinstance(patient_raw, dict):
+            patient_str = patient_raw.get("summary") or patient_raw.get("description") or "De-identified"
+            report_date = patient_raw.get("report_date") or data.get("report_date", "Not stated")
+        else:
+            patient_str = str(patient_raw) if patient_raw else "De-identified"
+            report_date = data.get("report_date", "Not stated")
+
+        lab_name = data.get("lab_name") or data.get("report_title") or "Clinical Laboratory"
+        summary_text = data.get("overall_summary") or data.get("summary") or "No summary available."
+
         with st.container(border=True):
             mc1, mc2 = st.columns([3, 1])
             with mc1:
-                st.caption(f"LAB REPORT • {data.get('lab_name', 'Clinical Laboratory')}")
+                st.caption(f"LAB REPORT • {lab_name}")
                 st.subheader("🔬 Diagnostic Laboratory Overview")
+                if patient_str and patient_str != "De-identified":
+                    st.caption(f"Patient Context: {patient_str}")
             with mc2:
-                st.caption(f"Date: {patient_info.get('report_date', 'Not stated')}")
-            st.write(data.get('overall_summary', 'No summary available.'))
+                st.caption(f"Date: {report_date}")
+            st.write(summary_text)
 
         med1, med2, med3 = st.columns(3)
         with med1:
@@ -708,7 +736,11 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         with med_tab_results:
             results = data.get("test_results", [])
+            if not isinstance(results, list):
+                results = []
             for r in results:
+                if not isinstance(r, dict):
+                    continue
                 t_name = r.get("test_name", "Test Analyte")
                 raw_val = r.get("raw_result", "")
                 unit = r.get("unit", "")
@@ -740,6 +772,8 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         with med_tab_questions:
             checklist = data.get("doctor_discussion_checklist", [])
+            if not isinstance(checklist, list):
+                checklist = []
             st.markdown("##### 🩺 Doctor Discussion Checklist")
             for idx, q in enumerate(checklist, 1):
                 with st.container(border=True):
@@ -795,7 +829,11 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         with study_tab_notes:
             notes = data.get("revision_notes", [])
+            if not isinstance(notes, list):
+                notes = []
             for n in notes:
+                if not isinstance(n, dict):
+                    continue
                 cat = n.get("category", "Key Concept")
                 title = n.get("title", "Concept")
                 content = n.get("content", "")
@@ -817,12 +855,16 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
 
         with study_tab_quiz:
             quiz_list = data.get("quiz", [])
+            if not isinstance(quiz_list, list):
+                quiz_list = []
             st.markdown("##### 📝 Grounded Practice Quiz (5 Questions)")
             st.caption("Multiple-choice questions generated strictly from your notes. Correct answers are hidden until submission.")
 
             with st.form("study_quiz_form"):
                 current_choices = {}
                 for q in quiz_list:
+                    if not isinstance(q, dict):
+                        continue
                     q_id = q.get("question_id", 1)
                     q_stem = q.get("question", "")
                     options = q.get("options", [])
