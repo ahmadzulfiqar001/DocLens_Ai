@@ -31,8 +31,11 @@ DocuLens AI is a modern document intelligence web application powered by **Googl
 
 ```
 DocLens_Ai/
+├── assets/
+│   ├── logo.svg                        # DocuLens AI vector aperture logo
+│   └── logo_full.svg                   # Full horizontal brand lockup
 ├── .streamlit/
-│   ├── config.toml                     # Streamlit theme (Obsidian & Indigo) and server limits
+│   ├── config.toml                     # Streamlit theme (High-contrast Cyber Emerald & Obsidian Noir)
 │   └── secrets.toml.example            # Template for Gemini API keys
 ├── demo_fixtures/                      # Six evaluation fixtures defined in the PRD
 │   ├── 01_incomplete_contract.txt      # Tests vague payment & missing termination/dispute clauses

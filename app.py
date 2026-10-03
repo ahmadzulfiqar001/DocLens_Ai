@@ -51,6 +51,8 @@ from src.export import generate_txt_report
 from src.ui_components import (
     CUSTOM_CSS,
     render_medical_avatar_banner,
+    render_sidebar_header,
+    render_hero_banner,
     get_priority_badge,
     get_medical_comparison_badge
 )
@@ -139,17 +141,7 @@ def check_context_invalidation(new_file_hash: Optional[str], new_mode: str, new_
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown(
-        f"""
-        <div style="padding: 0.5rem 0 1rem 0;">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <span style="font-size: 1.8rem;">🔍</span>
-                <span style="font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; color: #FFFFFF;">{APP_NAME}</span>
-            </div>
-            <div style="font-size: 0.76rem; color: #94A3B8; margin-top: 0.2rem;">
-                v{APP_VERSION} • Grounded Document Intelligence
-            </div>
-        </div>
-        """,
+        render_sidebar_header(APP_NAME, APP_VERSION),
         unsafe_allow_html=True
     )
     st.divider()
@@ -308,21 +300,12 @@ with st.sidebar:
 # Top Header Banner
 header_col1, header_col2 = st.columns([3, 1])
 with header_col1:
-    mode_emoji = "📄" if st.session_state.active_mode == MODE_DOC_LENS else ("🩺" if st.session_state.active_mode == MODE_MEDICAL_LENS else "🎓")
     st.markdown(
-        f"""
-        <div style="margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; color: #FFFFFF;">
-                    {st.session_state.active_mode}
-                </h1>
-                <span class="badge-pill badge-source">{st.session_state.active_language}</span>
-            </div>
-            <p style="margin: 0.35rem 0 0 0; color: #94A3B8; font-size: 0.92rem;">
-                {APP_TAGLINE}
-            </p>
-        </div>
-        """,
+        render_hero_banner(
+            st.session_state.active_mode,
+            st.session_state.active_language,
+            APP_TAGLINE
+        ),
         unsafe_allow_html=True
     )
 

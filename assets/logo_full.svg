@@ -1,0 +1,54 @@
+<svg width="320" height="72" viewBox="0 0 320 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fullLensGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00E599"/>
+      <stop offset="50%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="80" y1="20" x2="260" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
+    </linearGradient>
+    <linearGradient id="aiTagGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00E599"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left Icon Mark -->
+  <g transform="translate(6, 6) scale(0.3)">
+    <!-- Ambient background glow -->
+    <circle cx="100" cy="100" r="92" fill="#00E599" fill-opacity="0.2"/>
+    <!-- Calibration Track -->
+    <circle cx="100" cy="100" r="86" stroke="url(#fullLensGrad)" stroke-width="2.5" stroke-dasharray="6 4"/>
+    <line x1="100" y1="6" x2="100" y2="18" stroke="#00E599" stroke-width="3" stroke-linecap="round"/>
+    <line x1="100" y1="182" x2="100" y2="194" stroke="#00E599" stroke-width="3" stroke-linecap="round"/>
+    <line x1="6" y1="100" x2="18" y2="100" stroke="#00E599" stroke-width="3" stroke-linecap="round"/>
+    <line x1="182" y1="100" x2="194" y2="100" stroke="#00E599" stroke-width="3" stroke-linecap="round"/>
+    <!-- Chassis -->
+    <circle cx="100" cy="100" r="70" fill="#0A110E" stroke="url(#fullLensGrad)" stroke-width="3.5"/>
+    <!-- Blades -->
+    <path d="M100 42 L138 64 L120 102 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <path d="M138 64 L158 100 L120 120 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <path d="M158 100 L138 136 L100 120 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <path d="M138 136 L100 158 L80 120 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <path d="M100 158 L62 136 L80 100 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <path d="M62 136 L42 100 L80 80 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <path d="M42 100 L62 64 L100 80 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <path d="M62 64 L100 42 L120 80 Z" fill="#00E599" fill-opacity="0.8" stroke="#00E599" stroke-width="1.2"/>
+    <!-- Core -->
+    <circle cx="100" cy="100" r="28" fill="#040806" stroke="#00E599" stroke-width="2.5"/>
+    <path d="M100 78 Q100 100 78 100 Q100 100 100 122 Q100 100 122 100 Q100 100 100 78 Z" fill="#FFFFFF"/>
+    <circle cx="100" cy="100" r="4.5" fill="#00E599"/>
+  </g>
+
+  <!-- Typography: DocuLens -->
+  <text x="76" y="44" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="27" font-weight="800" fill="url(#textGrad)" letter-spacing="-0.5px">Docu<tspan fill="#00E599">Lens</tspan></text>
+  
+  <!-- AI Neon Badge Pill -->
+  <rect x="228" y="24" width="40" height="24" rx="6" fill="#00E599" fill-opacity="0.16" stroke="#00E599" stroke-width="1.2"/>
+  <text x="248" y="41" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="12" font-weight="800" fill="#00E599" text-anchor="middle" letter-spacing="1px">AI</text>
+  
+  <!-- Subtitle Tagline -->
+  <text x="77" y="60" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="10.5" font-weight="500" fill="#94A3B8" letter-spacing="0.4px">GROUNDED DOCUMENT INTELLIGENCE</text>
+</svg>
