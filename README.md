@@ -4,10 +4,10 @@
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.39%2B-FF4B4B.svg)](https://streamlit.io/)
-[![Groq Cloud](https://img.shields.io/badge/Groq-Llama--3.3--70B-orange.svg)](https://groq.com/)
+[![Google Gemini](https://img.shields.io/badge/Google-Gemini--2.5--Flash-4285F4.svg)](https://aistudio.google.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-DocuLens AI is a modern document intelligence web application that transforms uploaded documents into understandable summaries, source-backed findings, interactive quizzes, and actionable next steps across three specialized lenses:
+DocuLens AI is a modern document intelligence web application powered by **Google Gemini** that transforms uploaded documents into understandable summaries, source-backed findings, interactive quizzes, and actionable next steps across three specialized lenses:
 1. **📄 Document Lens**: Rigorous contract & agreement review against standard topics, identifying vague clauses, missing provisions, and deterministic review priorities. Also supports general documents with key operational facts.
 2. **🩺 Medical Lens**: Objective laboratory report analysis featuring boundary-aware numeric interval comparisons, conflict detection between laboratory flags and ranges, doctor discussion checklists, and non-diagnostic educational explanations accompanied by a static AI Report Assistant avatar.
 3. **🎓 Study Lens**: Accelerated learning engine that extracts definitions, formulas, and study steps, and automatically generates an interactive 5-question multiple-choice practice quiz with hidden answers, scoring, and source citations.
@@ -16,6 +16,7 @@ DocuLens AI is a modern document intelligence web application that transforms up
 
 ## 🌟 Key Features
 
+* **Google Gen AI Integration**: Powered by the official Google Gen AI Python SDK (`google-genai`) with models like `gemini-2.5-flash` and `gemini-2.5-pro`.
 * **Multi-Format Extraction**: Ingests PDF, DOCX, and TXT files up to 10 MB, preserving exact source locations (`[Page X]` or `[Para Y]`).
 * **Deterministic Computations**: Model supplies textual explanations, while application code deterministically computes review priorities, medical range comparisons, and quiz scores.
 * **Grounded Document Chat**: Q&A strictly backed by active document citations. Medical requests for diagnosis or medication trigger explicit boundary statements with clinician-directed questions.
@@ -29,28 +30,33 @@ DocuLens AI is a modern document intelligence web application that transforms up
 ## 📁 Repository Structure
 
 ```
-Doculens_Ai/
+DocLens_Ai/
 ├── .streamlit/
 │   ├── config.toml                     # Streamlit theme (Obsidian & Indigo) and server limits
-│   └── secrets.toml.example            # Template for Groq API keys
+│   └── secrets.toml.example            # Template for Gemini API keys
 ├── demo_fixtures/                      # Six evaluation fixtures defined in the PRD
 │   ├── 01_incomplete_contract.txt      # Tests vague payment & missing termination/dispute clauses
+│   ├── 02_complete_contract.docx       # Binary DOCX version of complete contract
 │   ├── 02_complete_contract.txt        # Tests clean agreement with all 6 checklist topics clear
 │   ├── 03_general_document.txt         # Tests non-contract operational policy review
+│   ├── 04_medical_report_standard.pdf  # Binary PDF version of clinical laboratory report
 │   ├── 04_medical_report_standard.txt  # Tests metabolic panel, boundary values, and lab flags
 │   ├── 05_medical_report_ambiguous.txt # Tests qualitative results, missing ranges & flag conflicts
+│   ├── 06_study_notes_compiler.pdf     # Binary PDF version of compiler lecture notes
 │   └── 06_study_notes_compiler.txt     # Tests compiler lecture notes, formulas & 5-MCQ quiz
 ├── src/
 │   ├── __init__.py                     # Package marker
-│   ├── config.py                       # Constants, limits (10MB, 15 pages, 25k chars), modes
+│   ├── config.py                       # Constants, limits (10MB, 15 pages, 25k chars), Gemini models
 │   ├── deterministic_rules.py          # Deterministic priority rules, range logic, quiz scoring
 │   ├── extractors.py                   # PDF (PyMuPDF), DOCX, TXT extractors with source anchors
 │   ├── export.py                       # UTF-8 formatted text analysis report generator
-│   ├── groq_client.py                  # Groq API client with 1-attempt repair & rate limit handling
+│   ├── gemini_client.py                # Official Google Gen AI client with 1-attempt repair & SDK calls
 │   ├── prompts.py                      # Injection-hardened system prompts & RTL multilingual rules
 │   ├── schemas.py                      # Pydantic data schemas for structured JSON responses
 │   └── ui_components.py                # Glassmorphic CSS, static avatar SVG, badges & cards
 ├── app.py                              # Main Streamlit dashboard entrypoint
+├── generate_fixtures.py                # Fixture generator utility
+├── test_doculens.py                    # PRD Acceptance Criteria test suite
 ├── requirements.txt                    # Project dependencies
 ├── .gitignore                          # Git exclusions (secrets, venvs, cache)
 └── README.md                           # Documentation & deployment guide
@@ -63,7 +69,7 @@ Doculens_Ai/
 ### 1. Prerequisites
 * Python 3.12 or higher ([Download Python](https://www.python.org/downloads/))
 * Git installed ([Download Git](https://git-scm.com/))
-* A free Groq Cloud API Key ([Groq Console](https://console.groq.com/keys))
+* A free Google Gemini API Key ([Google AI Studio](https://aistudio.google.com/apikey))
 
 ### 2. Clone the Repository
 Open PowerShell or Command Prompt:
@@ -84,17 +90,17 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 5. Configure Groq API Credentials
+### 5. Configure Gemini API Credentials
 Create a `.streamlit/secrets.toml` file from the example:
 ```powershell
 copy .streamlit\secrets.toml.example .streamlit\secrets.toml
 ```
-Open `.streamlit/secrets.toml` in your text editor and add your Groq key:
+Open `.streamlit/secrets.toml` in your text editor and add your Gemini key:
 ```toml
-GROQ_API_KEY = "gsk_your_actual_groq_api_key_here"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GEMINI_API_KEY = "AIzaSy_your_actual_gemini_api_key_here"
+GEMINI_MODEL = "gemini-2.5-flash"
 ```
-*(Alternatively, you can set an environment variable `setx GROQ_API_KEY "your_key"` or enter it directly into the app's sidebar settings).*
+*(Alternatively, you can set an environment variable `set GEMINI_API_KEY=your_key` or enter it directly into the app's sidebar settings).*
 
 ### 6. Run the Application
 ```powershell
@@ -106,16 +112,14 @@ DocuLens AI will open automatically in your browser at `http://localhost:8501`.
 
 ## ☁️ Streamlit Community Cloud Deployment
 
-Deploying DocuLens AI to Streamlit Community Cloud is straightforward:
+Deploying DocuLens AI to Streamlit Community Cloud:
 
-1. **Push to GitHub**:
-   Ensure all files are committed and pushed to your GitHub repository:
+1. **Commit & Push to GitHub**:
    ```bash
    git add .
-   git commit -m "Initial commit of DocuLens AI"
+   git commit -m "Update to Google Gemini API"
    git push origin main
    ```
-   *(Note: `.gitignore` automatically prevents your `.streamlit/secrets.toml` from being pushed).*
 
 2. **Connect to Streamlit Cloud**:
    * Visit [share.streamlit.io](https://share.streamlit.io/) and log in with GitHub.
@@ -125,11 +129,11 @@ Deploying DocuLens AI to Streamlit Community Cloud is straightforward:
    * Set **Main file path**: `app.py`.
 
 3. **Configure Secrets in Streamlit Cloud**:
-   * Click **Advanced settings** (or go to App Settings > Secrets after creating).
+   * Click **Advanced settings** (or App Settings > Secrets after creating).
    * In the Secrets editor, paste:
      ```toml
-     GROQ_API_KEY = "gsk_your_actual_groq_api_key_here"
-     GROQ_MODEL = "llama-3.3-70b-versatile"
+     GEMINI_API_KEY = "AIzaSy_your_actual_gemini_api_key_here"
+     GEMINI_MODEL = "gemini-2.5-flash"
      ```
    * Click **Save**.
 
@@ -157,4 +161,3 @@ Deploying DocuLens AI to Streamlit Community Cloud is straightforward:
 
 ## ⚖️ License
 Released under the MIT License. Public demonstrations utilize fictional, de-identified sample records.
-

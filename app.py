@@ -25,15 +25,15 @@ from src.config import (
     LANG_ROMAN_URDU,
     LANG_URDU,
     ALL_LANGUAGES,
-    DEFAULT_GROQ_MODEL,
-    AVAILABLE_GROQ_MODELS,
+    DEFAULT_GEMINI_MODEL,
+    AVAILABLE_GEMINI_MODELS,
     MAX_FILE_SIZE_BYTES,
     MAX_PDF_PAGES,
     MAX_EXTRACTED_CHARS
 )
 from src.extractors import extract_document, ExtractedDocument
 from src.deterministic_rules import compute_medical_range, compute_contract_metrics, calculate_quiz_score
-from src.groq_client import call_groq_json_analysis, call_groq_grounded_chat, get_api_key
+from src.gemini_client import call_gemini_json_analysis, call_gemini_grounded_chat, get_gemini_api_key
 from src.prompts import (
     get_contract_lens_prompt,
     get_general_doc_prompt,
@@ -83,8 +83,8 @@ def init_session_state():
         "app_state": "empty",  # empty, validating, extracting, analyzing, ready, unsupported_input, service_error
         "error_message": None,
         "last_raw_prompt": None,
-        "custom_groq_key": "",
-        "selected_model": DEFAULT_GROQ_MODEL
+        "custom_gemini_key": "",
+        "selected_model": DEFAULT_GEMINI_MODEL
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -207,37 +207,37 @@ with st.sidebar:
 
     st.divider()
 
-    # Groq Model & API Key Configuration
-    st.markdown("##### ⚡ 4. Groq Configuration")
-    configured_key = get_api_key(st.session_state.custom_groq_key)
+    # Gemini Model & API Key Configuration
+    st.markdown("##### ⚡ 4. Gemini Configuration")
+    configured_key = get_gemini_api_key(st.session_state.custom_gemini_key)
     if configured_key:
         st.markdown(
             '<div style="font-size: 0.75rem; color: #34D399; margin-bottom: 0.5rem;">'
-            '● Groq API Key Connected</div>',
+            '● Gemini API Key Connected</div>',
             unsafe_allow_html=True
         )
     else:
         st.markdown(
             '<div style="font-size: 0.75rem; color: #F87171; margin-bottom: 0.5rem;">'
-            '● Missing Groq API Key</div>',
+            '● Missing Gemini API Key</div>',
             unsafe_allow_html=True
         )
 
     with st.expander("API Key & Model Settings"):
         user_key = st.text_input(
-            "Groq API Key",
+            "Gemini API Key",
             type="password",
-            value=st.session_state.custom_groq_key,
-            placeholder="gsk_..."
+            value=st.session_state.custom_gemini_key,
+            placeholder="AIzaSy..."
         )
-        if user_key != st.session_state.custom_groq_key:
-            st.session_state.custom_groq_key = user_key
+        if user_key != st.session_state.custom_gemini_key:
+            st.session_state.custom_gemini_key = user_key
             st.rerun()
 
         model_choice = st.selectbox(
-            "Groq Model",
-            options=AVAILABLE_GROQ_MODELS,
-            index=AVAILABLE_GROQ_MODELS.index(st.session_state.selected_model) if st.session_state.selected_model in AVAILABLE_GROQ_MODELS else 0
+            "Gemini Model",
+            options=AVAILABLE_GEMINI_MODELS,
+            index=AVAILABLE_GEMINI_MODELS.index(st.session_state.selected_model) if st.session_state.selected_model in AVAILABLE_GEMINI_MODELS else 0
         )
         st.session_state.selected_model = model_choice
 
@@ -416,7 +416,7 @@ if st.session_state.extracted_doc:
 
         st.markdown(
             '<div style="font-size: 0.75rem; color: #94A3B8; margin-top: 0.4rem;">'
-            '🔒 Privacy Notice: Text fragments are securely processed in ephemeral memory and sent to Groq for analysis. No permanent server storage.'
+            '🔒 Privacy Notice: Text fragments are securely processed in ephemeral memory and sent to Google Gemini for analysis. No permanent server storage.'
             '</div>',
             unsafe_allow_html=True
         )
@@ -435,14 +435,14 @@ if st.session_state.extracted_doc:
             st.rerun()
 
 # -----------------------------------------------------------------------------
-# AI Analysis Execution via Groq
+# AI Analysis Execution via Google Gemini
 # -----------------------------------------------------------------------------
 if st.session_state.app_state == "analyzing" and st.session_state.extracted_doc:
     doc = st.session_state.extracted_doc
     mode = st.session_state.active_mode
     lang = st.session_state.active_language
 
-    with st.spinner(f"Analyzing {doc.filename} with Groq {st.session_state.selected_model} in {lang}..."):
+    with st.spinner(f"Analyzing {doc.filename} with Gemini {st.session_state.selected_model} in {lang}..."):
         if mode == MODE_DOC_LENS:
             if st.session_state.active_subtype == DOC_SUBTYPE_CONTRACT:
                 prompt = get_contract_lens_prompt(doc.full_text_with_sources, lang)
@@ -455,10 +455,10 @@ if st.session_state.app_state == "analyzing" and st.session_state.extracted_doc:
 
         st.session_state.last_raw_prompt = prompt
 
-        parsed_json, error = call_groq_json_analysis(
+        parsed_json, error = call_gemini_json_analysis(
             prompt=prompt,
             model=st.session_state.selected_model,
-            api_key=st.session_state.custom_groq_key
+            api_key=st.session_state.custom_gemini_key
         )
 
         if error:
@@ -739,18 +739,15 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                     st.markdown(user_question)
 
                 with st.chat_message("assistant"):
-                    with st.spinner("Searching document evidence..."):
-                        messages = get_grounded_chat_prompt(
+                    with st.spinner("Searching document evidence with Gemini..."):
+                        ans, err = call_gemini_grounded_chat(
                             document_text=st.session_state.extracted_doc.full_text_with_sources,
                             chat_history=st.session_state.chat_history,
                             user_query=user_question,
                             mode=st.session_state.active_mode,
-                            language=st.session_state.active_language
-                        )
-                        ans, err = call_groq_grounded_chat(
-                            messages=messages,
+                            language=st.session_state.active_language,
                             model=st.session_state.selected_model,
-                            api_key=st.session_state.custom_groq_key
+                            api_key=st.session_state.custom_gemini_key
                         )
                         if err:
                             st.error(err)
@@ -910,18 +907,15 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                     st.markdown(user_q)
 
                 with st.chat_message("assistant"):
-                    with st.spinner("Consulting report evidence..."):
-                        messages = get_grounded_chat_prompt(
+                    with st.spinner("Consulting report evidence with Gemini..."):
+                        ans, err = call_gemini_grounded_chat(
                             document_text=st.session_state.extracted_doc.full_text_with_sources,
                             chat_history=st.session_state.chat_history,
                             user_query=user_q,
                             mode=st.session_state.active_mode,
-                            language=st.session_state.active_language
-                        )
-                        ans, err = call_groq_grounded_chat(
-                            messages=messages,
+                            language=st.session_state.active_language,
                             model=st.session_state.selected_model,
-                            api_key=st.session_state.custom_groq_key
+                            api_key=st.session_state.custom_gemini_key
                         )
                         if err:
                             st.error(err)
@@ -1106,18 +1100,15 @@ if st.session_state.app_state == "ready" and st.session_state.analysis_data:
                     st.markdown(s_question)
 
                 with st.chat_message("assistant"):
-                    with st.spinner("Reviewing study material..."):
-                        messages = get_grounded_chat_prompt(
+                    with st.spinner("Reviewing study material with Gemini..."):
+                        ans, err = call_gemini_grounded_chat(
                             document_text=st.session_state.extracted_doc.full_text_with_sources,
                             chat_history=st.session_state.chat_history,
                             user_query=s_question,
                             mode=st.session_state.active_mode,
-                            language=st.session_state.active_language
-                        )
-                        ans, err = call_groq_grounded_chat(
-                            messages=messages,
+                            language=st.session_state.active_language,
                             model=st.session_state.selected_model,
-                            api_key=st.session_state.custom_groq_key
+                            api_key=st.session_state.custom_gemini_key
                         )
                         if err:
                             st.error(err)
@@ -1163,3 +1154,4 @@ elif st.session_state.app_state in ["empty", "ready_for_analysis"] and not st.se
         """,
         unsafe_allow_html=True
     )
+

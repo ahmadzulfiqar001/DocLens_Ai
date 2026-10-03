@@ -45,11 +45,12 @@ HIGH_PRIORITY_TOPICS = ["Payment Terms", "Termination", "Dispute Resolution"]
 # PRD D04: Medium covers other missing or unclear checklist topics
 MEDIUM_PRIORITY_TOPICS = ["Obligations", "Duration or Renewal", "Governing Law"]
 
-# Groq Model Defaults (Verified active production models)
-DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
-AVAILABLE_GROQ_MODELS = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant"
+# Google Gemini Model Defaults (Verified active production models)
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+AVAILABLE_GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-1.5-flash"
 ]
 
 # Static Avatar URL / SVG configuration (Medical Lens static AI avatar)
