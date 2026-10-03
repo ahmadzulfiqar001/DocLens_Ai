@@ -1,0 +1,32 @@
+ST. JUDE REGIONAL HEALTHCARE CENTER
+SPECIALIZED IMMUNOLOGY & URINALYSIS EVALUATION
+
+[Para 1]
+Patient Name: Robert Smith | Patient ID: RS-44102 | DOB: 11/22/1975
+Ordering Provider: Dr. Sarah Lin, MD | Report Date: October 2, 2026
+Accession Number: ACC-2026-88192 | Specimen: Serum & Random Clean-Catch Urine
+
+[Para 2]
+SEROLOGY & INFECTIOUS DISEASE SCREENING
+Test Name                           Result         Units      Reference Interval    Lab Flag
+Hepatitis B Surface Antigen (HBsAg) Non-Reactive   None       Not Applicable        Negative
+Hepatitis C Virus Antibody (Anti-HCV) Non-Reactive None       Not Applicable        Negative
+Syphilis RPR Qualitative Screen     Non-Reactive   None       Not Applicable        Negative
+
+[Para 3]
+URINALYSIS & EXPERIMENTAL BIOMARKERS
+Test Name                           Result         Units      Reference Interval    Lab Flag
+Urine Protein Qualitative           Trace          None       Negative              Abnormal
+Urine Leukocyte Esterase            Negative       None       Negative              Normal
+Experimental Neuro-Biomarker NBX    48.2           pg/mL      Pending Validation    Reported
+Troponin I High Sensitivity         0.012          ng/mL      < 0.034               Normal
+
+[Para 4]
+SPECIAL MICRONUTRIENT PANEL (OBSERVED CONFLICT)
+Test Name                           Result         Units      Reference Interval    Lab Flag
+Vitamin D, 25-Hydroxy               32.0           ng/mL      30.0 - 100.0          L
+
+[Para 5]
+LABORATORY REMARKS:
+Note on Vitamin D: Result 32.0 ng/mL is marked 'L' by manual technician review based on specialized local clinic guidelines suggesting optimal levels above 40 ng/mL, despite standard interval 30.0 - 100.0 ng/mL. Quantitative evaluation requires clinical provider reconciliation.
+

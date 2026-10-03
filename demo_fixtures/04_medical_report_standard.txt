@@ -1,0 +1,29 @@
+METRO HEALTH DIAGNOSTIC LABORATORIES
+PATIENT LABORATORY REPORT - COMPREHENSIVE METABOLIC & HEMATOLOGY PANEL
+
+[Para 1]
+Patient Name: Jane Doe | Patient ID: PT-99201 | DOB: 05/14/1982 | Sex: Female
+Ordering Physician: Dr. Marcus Vance, MD | Specimen Collected: 09/28/2026 08:15 AM
+Report Date: October 1, 2026 | Status: Final Result
+
+[Para 2]
+CLINICAL CHEMISTRY & METABOLIC PROFILE
+Test Name                 Result     Units      Reference Interval    Lab Flag
+Fasting Blood Glucose     118        mg/dL      70 - 99               H
+Hemoglobin A1c            6.8        %          4.0 - 5.6             H
+Total Cholesterol         185        mg/dL      125 - 200             Normal
+Serum Sodium              140        mmol/L     135 - 145             Normal
+Serum Potassium           3.5        mmol/L     3.5 - 5.0             Normal
+Serum Creatinine          0.85       mg/dL      0.60 - 1.20           Normal
+
+[Para 3]
+HEMATOLOGY & COMPLETE BLOOD COUNT
+Test Name                 Result     Units      Reference Interval    Lab Flag
+Hemoglobin                13.4       g/dL       12.0 - 16.0           Normal
+White Blood Cell Count    6.5        x10^3/uL   4.5 - 11.0            Normal
+Platelet Count            120        x10^3/uL   150 - 450             L
+
+[Para 4]
+LABORATORY COMMENTS & NOTES:
+Specimen received at temperature 4 deg C without hemolysis. Fasting interval verified as 12 hours. Values flagged 'H' indicate values exceeding laboratory reference thresholds; 'L' indicates values below reference threshold.
+

@@ -1,0 +1,34 @@
+DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING
+COURSE CS-401: COMPILER DESIGN AND OPTIMIZATION
+MODULE 4: INTERMEDIATE CODE GENERATION & SYNTAX-DIRECTED TRANSLATION
+
+[Para 1]
+1. Overview of Intermediate Representations (IR)
+Intermediate Representation (IR) is an abstract machine representation positioned between the front-end (lexical analysis, parsing, semantic analysis) and the back-end (instruction selection, register allocation, machine code generation) of a compiler. Using an IR provides machine independence: targeting a new CPU architecture requires only rewriting the back-end without modifying lexical or parsing stages.
+
+[Para 2]
+2. Key Definitions and Structures
+- Three-Address Code (TAC): An abstract language where every instruction contains at most one operator on the right-hand side and at most three address operands. The canonical form is `x = y op z`, or unary `x = op y`.
+- Quadruples: A record structure representation of TAC with four distinct fields: `(op, arg1, arg2, result)`. For example, `t1 = a + b` is stored as `(+, a, b, t1)`.
+- Triples: A representation avoiding explicit temporary variable names by referencing temporary results by their statement index array position: `(op, arg1, arg2)`.
+- Abstract Syntax Tree (AST): A condensed hierarchical tree representation of source syntax where internal nodes represent programming operators and leaf nodes represent operands.
+
+[Para 3]
+3. Translation of Expressions and Equations
+Consider the high-level arithmetic expression: `result = (a + b) * (c - d) + (a + b)`.
+In Three-Address Code with Common Subexpression Elimination (CSE):
+Step 1: Compute temporary addition `t1 = a + b`
+Step 2: Compute temporary subtraction `t2 = c - d`
+Step 3: Compute multiplication `t3 = t1 * t2`
+Step 4: Reuse previously computed `t1` for final addition `t4 = t3 + t1`
+Step 5: Assign final value `result = t4`
+This translation reduces total arithmetic operations from four down to three through DAG (Directed Acyclic Graph) node reuse.
+
+[Para 4]
+4. Control Flow and Boolean Expressions
+Control flow statements (such as `if-then-else` and `while` loops) are translated into conditional jumps `if condition goto L1` and unconditional jumps `goto L2`. Backpatching is a single-pass technique where target branch labels are left empty during initial code emission and filled in once target statement addresses become known.
+
+[Para 5]
+5. Type Checking and Symbol Tables
+Type synthesizers compute attribute types bottom-up using Syntax-Directed Definitions (SDD). The compiler maintains a symbol table with scoped hash tables storing identifier name, type, scope level, memory offset, and line number.
+

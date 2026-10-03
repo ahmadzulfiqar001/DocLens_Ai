@@ -1,0 +1,21 @@
+DOCULENS AI ENTERPRISE DATA GOVERNANCE & PRIVACY POLICY
+
+[Para 1]
+Document Version: 2.4 | Effective Date: October 1, 2026 | Issued by: Global Information Security Office, DocuLens Inc.
+
+[Para 2]
+1. Purpose and Scope
+This policy establishes mandatory operational protocols for processing user-uploaded textual documents, laboratory records, and academic materials. This framework applies to all production server instances, third-party inference endpoints, and automated data processing routines across all regions.
+
+[Para 3]
+2. Key Obligations and Architecture
+All customer document payloads must be evaluated strictly in-memory during active sessions. Ephemeral session containers must destroy text fragments upon session teardown or browser disconnect. Permanent disk persistence of raw customer document content is strictly prohibited.
+
+[Para 4]
+3. Encryption and Security Standards
+Data in transit between user clients and cloud inference endpoints must be encrypted using Transport Layer Security (TLS 1.3). Ephemeral storage must be secured using AES-256 encryption with automated key rotation managed by Azure Key Vault or AWS KMS.
+
+[Para 5]
+4. Deadlines and Compliance Audits
+Quarterly penetration testing and SOC 2 Type II compliance reviews must be completed by November 30, 2026. The Chief Information Security Officer (CISO) is responsible for certifying compliance findings within ten (10) business days following each quarterly audit.
+

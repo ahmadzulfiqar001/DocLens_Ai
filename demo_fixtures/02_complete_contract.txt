@@ -1,0 +1,29 @@
+MASTER CLOUD SERVICES AGREEMENT
+
+[Para 1]
+This Master Cloud Services Agreement ("Agreement") is executed on October 1, 2026, by and between Nexus Global Enterprise Corp ("Customer"), with offices at 500 Market Street, San Francisco, CA, and CloudMatrix Technologies Inc. ("Provider"), with offices at 100 Tech Parkway, Austin, TX.
+
+[Para 2]
+1. Services and Obligations
+Provider agrees to deliver enterprise multi-tenant cloud hosting, database management, and 24/7 technical monitoring. Provider covenants that the hosted platform shall maintain a 99.9% monthly uptime service level agreement (SLA), excluding scheduled maintenance windows announced at least 72 hours in advance.
+
+[Para 3]
+2. Fees and Payment Terms
+Customer agrees to pay an annual subscription fee of $48,000 USD, billed in quarterly installments of $12,000 USD. All undisputed invoices shall be due and payable within thirty (30) calendar days from receipt of invoice (Net 30) via wire transfer or ACH. Undisputed late balances shall accrue interest at 1.0% per month or the maximum legal rate.
+
+[Para 4]
+3. Term and Renewal
+The initial term of this Agreement shall commence on November 1, 2026, and shall continue for a duration of two (2) years. Thereafter, this Agreement shall automatically renew for successive one (1) year terms unless either party provides written notice of non-renewal at least sixty (60) days prior to the expiration of the current term.
+
+[Para 5]
+4. Termination
+Either party may terminate this Agreement without cause upon ninety (90) days prior written notice to the other party. Either party may terminate immediately for cause if the other party breaches any material term and fails to cure such breach within thirty (30) days of receiving written notice specifying the breach.
+
+[Para 6]
+5. Dispute Resolution
+In the event of any controversy, claim, or dispute arising out of or relating to this Agreement, the parties shall first engage in executive escalation in good faith for fifteen (15) business days. If unresolved, the dispute shall be finally settled by binding arbitration administered by the American Arbitration Association (AAA) under its Commercial Arbitration Rules, before a single arbitrator in Wilmington, Delaware.
+
+[Para 7]
+6. Governing Law and Jurisdiction
+This Agreement shall be governed by, interpreted, and enforced in accordance with the substantive laws of the State of Delaware, without regard to conflict of law principles.
+
